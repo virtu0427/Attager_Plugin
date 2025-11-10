@@ -221,9 +221,12 @@ PORT=8005            # Policy Server
 POLICY_SERVER_URL=http://policy-server:8005
 LOG_SERVER_URL=http://policy-server:8005
 
-# 에이전트 데이터 Redis
+# 에이전트 데이터 Redis (필요 시 AGENT_REDIS_* 로 오버라이드 가능)
 REDIS_HOST=redis-agents  # Docker: redis-agents, Local: localhost
 REDIS_PORT=6379
+AGENT_REDIS_HOST=redis-agents
+AGENT_REDIS_PORT=6379
+AGENT_REDIS_DB=0
 
 # API Key
 GEMINI_API_KEY=your-api-key

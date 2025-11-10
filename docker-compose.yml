@@ -48,34 +48,21 @@ services:
       retries: 5
 
   # Seed data for agent Redis
-  redis-agents-seeder:
-    image: redis:7-alpine
-    container_name: attager-redis-agents-seeder
+  agent-redis-seeder:
+    build:
+      context: ./agentDB
+      dockerfile: Dockerfile.seeder
+    container_name: attager-agent-redis-seeder
     depends_on:
       redis-agents:
         condition: service_healthy
     environment:
-      - REDIS_HOST=redis-agents
-      - REDIS_PORT=6379
+      - AGENT_REDIS_HOST=redis-agents
+      - AGENT_REDIS_PORT=6379
+      - AGENT_REDIS_DB=0
+      - AGENT_REDIS_WAIT_SECONDS=60
     volumes:
-      - ./agentDB/seed_data.txt:/seed/seed_data.txt:ro
-    command: >
-      sh -c "\
-        set -e; \
-        HOST=${REDIS_HOST:-redis-agents}; \
-        PORT=${REDIS_PORT:-6379}; \
-        until redis-cli -h \"$HOST\" -p \"$PORT\" ping >/dev/null 2>&1; do \
-          echo \"Waiting for agent Redis at $HOST:$PORT...\"; \
-          sleep 1; \
-        done; \
-        if [ \"$(redis-cli -h \"$HOST\" -p \"$PORT\" EXISTS agent_seed:version)\" = \"0\" ]; then \
-          echo \"Seeding agent Redis with sample data...\"; \
-          redis-cli -h \"$HOST\" -p \"$PORT\" < /seed/seed_data.txt; \
-          redis-cli -h \"$HOST\" -p \"$PORT\" SET agent_seed:version 1; \
-          echo \"Agent Redis seed completed.\"; \
-        else \
-          echo \"Agent Redis already seeded. Skipping seeding step.\"; \
-        fi"
+      - ./agentDB/seed_data.txt:/app/seed_data.txt:ro
     networks:
       - agent-network
     restart: "no"
@@ -155,7 +142,7 @@ services:
     depends_on:
       redis-agents:
         condition: service_healthy
-      redis-agents-seeder:
+      agent-redis-seeder:
         condition: service_completed_successfully
       policy-server:
         condition: service_started
@@ -179,7 +166,7 @@ services:
     depends_on:
       redis-agents:
         condition: service_healthy
-      redis-agents-seeder:
+      agent-redis-seeder:
         condition: service_completed_successfully
       policy-server:
         condition: service_started
@@ -203,7 +190,7 @@ services:
     depends_on:
       redis-agents:
         condition: service_healthy
-      redis-agents-seeder:
+      agent-redis-seeder:
         condition: service_completed_successfully
       policy-server:
         condition: service_started
@@ -227,7 +214,7 @@ services:
     depends_on:
       redis-agents:
         condition: service_healthy
-      redis-agents-seeder:
+      agent-redis-seeder:
         condition: service_completed_successfully
       policy-server:
         condition: service_started

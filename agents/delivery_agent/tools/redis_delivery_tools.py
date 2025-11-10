@@ -4,10 +4,14 @@ import redis
 from typing import Dict, Any, Optional, List, Tuple
 
 # Redis 연결
+REDIS_HOST = os.getenv("AGENT_REDIS_HOST", os.getenv("REDIS_HOST", "localhost"))
+REDIS_PORT = int(os.getenv("AGENT_REDIS_PORT", os.getenv("REDIS_PORT", "6379")))
+REDIS_DB = int(os.getenv("AGENT_REDIS_DB", os.getenv("REDIS_DB", "0")))
+
 redis_client = redis.Redis(
-    host=os.getenv("REDIS_HOST", "localhost"),
-    port=int(os.getenv("REDIS_PORT", "6379")),
-    db=0,
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    db=REDIS_DB,
     decode_responses=True,
 )
 

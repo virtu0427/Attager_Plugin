@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import os
 import shlex
+import time
 from pathlib import Path
 from typing import Iterable, List
 
 import redis
+from redis import exceptions as redis_exceptions
 
 
 def _resolve_seed_file() -> Path:
@@ -26,6 +28,29 @@ def _get_redis_client() -> redis.Redis:
     port = int(os.getenv("AGENT_REDIS_PORT", os.getenv("REDIS_PORT", "6379")))
     db = int(os.getenv("AGENT_REDIS_DB", os.getenv("REDIS_DB", "0")))
     return redis.Redis(host=host, port=port, db=db, decode_responses=True)
+
+
+def _wait_for_connection(client: redis.Redis) -> None:
+    timeout = float(os.getenv("AGENT_REDIS_WAIT_SECONDS", "30"))
+    poll_interval = float(os.getenv("AGENT_REDIS_WAIT_INTERVAL", "1"))
+    deadline = time.monotonic() + timeout
+    conn_kwargs = client.connection_pool.connection_kwargs
+    host = conn_kwargs.get("host")
+    port = conn_kwargs.get("port")
+
+    print(f"Waiting for agent Redis at {host}:{port} (timeout {timeout}s)...")
+
+    while True:
+        try:
+            client.ping()
+            print("Agent Redis connection established.")
+            return
+        except redis_exceptions.ConnectionError:
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Timed out after {timeout} seconds waiting for Redis at {host}:{port}"
+                )
+            time.sleep(poll_interval)
 
 
 def _parse_seed_commands(seed_lines: Iterable[str]) -> List[tuple[str, str, List[str]]]:
@@ -51,7 +76,17 @@ def _parse_seed_commands(seed_lines: Iterable[str]) -> List[tuple[str, str, List
 def seed_agent_redis(seed_version: str = "1") -> None:
     client = _get_redis_client()
 
-    if client.exists("agent_seed:version"):
+    try:
+        _wait_for_connection(client)
+    except TimeoutError as exc:
+        raise ConnectionError(str(exc)) from exc
+
+    force_reseed = os.getenv("AGENT_REDIS_FORCE_RESEED", "false").lower() in {"1", "true", "yes"}
+
+    if force_reseed:
+        print("Force reseed requested; flushing existing agent dataset...")
+        client.flushdb()
+    elif client.exists("agent_seed:version"):
         print("Agent Redis already seeded; skipping.")
         return
 
