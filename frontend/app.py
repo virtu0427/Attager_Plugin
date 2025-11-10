@@ -16,9 +16,10 @@ CORS(app)
 # Redis connection settings from environment
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6380))
+REDIS_DB = int(os.getenv("REDIS_DB", 0))
 
 # Initialize database
-db = get_db(redis_host=REDIS_HOST, redis_port=REDIS_PORT)
+db = get_db(redis_host=REDIS_HOST, redis_port=REDIS_PORT, redis_db=REDIS_DB)
 
 # ========== Static Pages ==========
 @app.route('/')

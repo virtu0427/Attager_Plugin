@@ -47,6 +47,39 @@ services:
       timeout: 5s
       retries: 5
 
+  # Seed data for agent Redis
+  redis-agents-seeder:
+    image: redis:7-alpine
+    container_name: attager-redis-agents-seeder
+    depends_on:
+      redis-agents:
+        condition: service_healthy
+    environment:
+      - REDIS_HOST=redis-agents
+      - REDIS_PORT=6379
+    volumes:
+      - ./agentDB/seed_data.txt:/seed/seed_data.txt:ro
+    command: >
+      sh -c "\
+        set -e; \
+        HOST=${REDIS_HOST:-redis-agents}; \
+        PORT=${REDIS_PORT:-6379}; \
+        until redis-cli -h \"$HOST\" -p \"$PORT\" ping >/dev/null 2>&1; do \
+          echo \"Waiting for agent Redis at $HOST:$PORT...\"; \
+          sleep 1; \
+        done; \
+        if [ \"$(redis-cli -h \"$HOST\" -p \"$PORT\" EXISTS agent_seed:version)\" = \"0\" ]; then \
+          echo \"Seeding agent Redis with sample data...\"; \
+          redis-cli -h \"$HOST\" -p \"$PORT\" < /seed/seed_data.txt; \
+          redis-cli -h \"$HOST\" -p \"$PORT\" SET agent_seed:version 1; \
+          echo \"Agent Redis seed completed.\"; \
+        else \
+          echo \"Agent Redis already seeded. Skipping seeding step.\"; \
+        fi"
+    networks:
+      - agent-network
+    restart: "no"
+
   # Redis for IAM Solution (IAM 솔루션 전용 Redis)
   redis-iam:
     image: redis:7-alpine
@@ -75,6 +108,7 @@ services:
     environment:
       - REDIS_HOST=redis-iam
       - REDIS_PORT=6379
+      - REDIS_DB=0
       - PORT=8005
     depends_on:
       redis-iam:
@@ -94,6 +128,7 @@ services:
     environment:
       - REDIS_HOST=redis-iam
       - REDIS_PORT=6379
+      - REDIS_DB=0
       - PORT=8006
     depends_on:
       redis-iam:
@@ -120,6 +155,8 @@ services:
     depends_on:
       redis-agents:
         condition: service_healthy
+      redis-agents-seeder:
+        condition: service_completed_successfully
       policy-server:
         condition: service_started
     networks:
@@ -142,6 +179,8 @@ services:
     depends_on:
       redis-agents:
         condition: service_healthy
+      redis-agents-seeder:
+        condition: service_completed_successfully
       policy-server:
         condition: service_started
     networks:
@@ -164,6 +203,8 @@ services:
     depends_on:
       redis-agents:
         condition: service_healthy
+      redis-agents-seeder:
+        condition: service_completed_successfully
       policy-server:
         condition: service_started
     networks:
@@ -186,6 +227,8 @@ services:
     depends_on:
       redis-agents:
         condition: service_healthy
+      redis-agents-seeder:
+        condition: service_completed_successfully
       policy-server:
         condition: service_started
     networks:

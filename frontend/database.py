@@ -16,6 +16,11 @@ class IAMDatabase:
             db=redis_db,
             decode_responses=True
         )
+        self.redis_settings = {
+            "host": redis_host,
+            "port": redis_port,
+            "db": redis_db,
+        }
         
         # Initialize with default data if empty
         self._init_default_data()
@@ -609,9 +614,10 @@ class IAMDatabase:
 # Global database instance
 db = None
 
-def get_db(redis_host: str = "localhost", redis_port: int = 6379) -> IAMDatabase:
+
+def get_db(redis_host: str = "localhost", redis_port: int = 6379, redis_db: int = 0) -> IAMDatabase:
     """Get or create database instance"""
     global db
     if db is None:
-        db = IAMDatabase(redis_host=redis_host, redis_port=redis_port)
+        db = IAMDatabase(redis_host=redis_host, redis_port=redis_port, redis_db=redis_db)
     return db
