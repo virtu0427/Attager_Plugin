@@ -15,8 +15,8 @@ from pydantic import BaseModel
 from typing import Dict, List, Optional
 import uvicorn
 
-# Import database module from frontend
-from frontend.database import get_db
+# Import database module from IAM package
+from iam.database import get_db
 
 app = FastAPI(title="IAM Policy Server (Redis Backend)")
 

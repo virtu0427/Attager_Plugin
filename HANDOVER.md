@@ -13,6 +13,7 @@
 ## 2. 저장소 구조 요약
 ```
 ├── frontend/                # Flask 앱, 템플릿, 정적 리소스, IAM Redis 연동
+├── iam/                     # A2A 다중 에이전트 보안 솔루션 (정책 플러그인/DB 래퍼)
 ├── Orchestrator_plugin/     # FastAPI 정책 서버, 정책/로그 API, Dockerfile
 ├── Orchestrator_new/        # 로컬 오케스트레이터 실행 엔트리 (개발용)
 ├── agents/                  # 업무용 에이전트 (delivery/item/quality/vehicle)
@@ -70,7 +71,7 @@ docker compose down -v   # 데이터 볼륨까지 초기화
   - Docker 실행 시 `agent-redis-seeder` 컨테이너가 자동 실행 (healthcheck 대기 + 멱등 시드)
   - 수동 시드 예시: `AGENT_REDIS_HOST=localhost python agentDB/seed_agent_data.py`
 - **IAM Redis (`redis-iam`)**
-  - 기본 데이터는 `frontend/database.py` 초기화 로직으로 적재 (에이전트/룰셋/정책/로그 키)
+  - 기본 데이터는 `iam/database.py` 초기화 로직(프론트엔드 호환용 래퍼: `frontend/database.py`)으로 적재 (에이전트/룰셋/정책/로그 키)
   - 프론트엔드에서 CRUD 수행 시 즉시 Redis에 반영
 
 ## 6. 주요 코드/모듈 설명
@@ -79,8 +80,12 @@ docker compose down -v   # 데이터 볼륨까지 초기화
   - `/api/graph/agent-flow`, `/api/stats/overview` 등 데이터 엔드포인트 포함
   - Redis 커넥션은 `frontend/database.get_db()`를 통해 주입
 - `frontend/database.py`
+  - 프론트엔드 호환을 위한 래퍼 모듈로, 실제 CRUD 로직은 `iam/database.py`에 위임
+- `iam/database.py`
   - IAM Redis 헬퍼 (에이전트, 룰셋, 정책, 로그 CRUD + 통계)
-  - 새 인스턴스 생성 시 기본 데이터 자동 세팅 → Docker 로컬 환경에서 초기 화면 보장
+  - 새 인스턴스 생성 시 기본 데이터 자동 세팅 → Docker/로컬 환경에서 초기 화면 보장
+- `iam/policy_enforcement.py`
+  - A2A 환경 공용 IAM 정책 플러그인 (프롬프트/툴 검증 + 감사 로그 전송)
 - `frontend/*/*.js`
   - 순수 JS로 API 호출·렌더링 처리 (한글 UI 기준)
   - MiniSearch 기반 로그 검색 (`frontend/logs/logs.js`)
@@ -135,6 +140,12 @@ python Orchestrator_plugin/server_redis.py
 - Gemini API 키는 실제 운영 시 Secret Manager나 Vault 연동 고려
 - 로그 고도화(예: ElasticSearch 연동) 및 IAM 정책 스키마 버전 관리가 후속 과제로 남아 있음
 - Kubernetes 이전을 고려할 경우, Redis 2종을 각기 StatefulSet으로 구성하고 시드 잡(CronJob) 분리 권장
+
+## 11. A2A 보안 솔루션 적용 주의사항
+- **보안 솔루션 모듈 분리**: A2A 환경에서 공통으로 사용하는 IAM 보안 컴포넌트는 `iam/` 패키지에 집약되어 있습니다. 새로운 에이전트나 오케스트레이터에서 정책 플러그인을 사용할 때는 반드시 `from iam.policy_enforcement import PolicyEnforcementPlugin` 형태로 임포트해 주세요.
+- **환경별 의존성 분리**: 실행 환경 스크립트(`agents/*`, `Orchestrator_new/`)는 에이전트 로직에 집중하고, 보안 로직은 `iam/`을 통해 주입합니다. 환경 설정 변경 시 보안 로직을 직접 수정하지 말고 환경 변수(`POLICY_SERVER_URL`, `LOG_SERVER_URL`, `GOOGLE_API_KEY`)만 조정해야 합니다.
+- **IAM 룰 검증 절차**: 정책 서버(`Orchestrator_plugin/server_redis.py`)는 Redis에 저장된 룰셋을 그대로 반환합니다. 새로운 룰을 추가하거나 정책을 변경한 뒤에는 `iam.policy_enforcement.PolicyEnforcementPlugin.fetch_policy()`를 호출하거나 서비스 재기동으로 정책을 갱신하고, `/api/iam/policy/{agent_id}` 응답 구조(`prompt_validation_rules`, `tool_validation_rules`)가 플러그인에서 기대하는 스키마와 일치하는지 확인하세요.
+- **로그 수집 확인**: 플러그인은 정책 위반 시 `/api/logs` 엔드포인트로 감사 로그를 전송합니다. 로그 저장소가 분리된 환경에서는 해당 엔드포인트를 프록시하거나 IAM Redis에 쓰기 권한을 가진 API 게이트웨이를 구성해야 합니다.
 
 ---
 이 문서는 새로운 에이전트나 개발자가 빠르게 환경을 이해하고 기동할 수 있도록 현재 구성과 절차를 요약합니다. 추가 질문이나 업데이트는 `ARCHITECTURE.md`, `DOCKER_GUIDE.md`, `README.md`를 참고하거나 최신 변경 사항 커밋 메시지를 확인하세요.

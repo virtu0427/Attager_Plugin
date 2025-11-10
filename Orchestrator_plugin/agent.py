@@ -29,7 +29,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
 from utils.model_config import get_model_with_fallback
-from Orchestrator_plugin.policy_enforcement_plugin import PolicyEnforcementPlugin
+from iam.policy_enforcement import PolicyEnforcementPlugin
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)

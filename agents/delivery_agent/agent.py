@@ -27,7 +27,6 @@ try:
         get_all_deliveries,
         get_completed_deliveries,
     )
-    from policy_enforcement_plugin import PolicyEnforcementPlugin
 except ImportError:
     # 로컬 환경 (agents/delivery_agent/)
     from agents.delivery_agent.tools.redis_delivery_tools import (
@@ -35,7 +34,8 @@ except ImportError:
         get_all_deliveries,
         get_completed_deliveries,
     )
-    from agents.delivery_agent.policy_enforcement_plugin import PolicyEnforcementPlugin
+
+from iam.policy_enforcement import PolicyEnforcementPlugin
 
 # utils는 프로젝트 루트에 있으므로 별도 처리
 try:
