@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A2A Security Dashboard - 로그</title>
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/minisearch@6.1.0/dist/umd/index.min.js" defer></script>
+    <script src="logs.js" defer></script>
+  </head>
+  <body>
+    <div class="app-container" data-page="logs">
+      <header class="app-header">
+        <div class="logo">A2A SECURE</div>
+        <nav class="main-nav">
+          <a href="../dashboard.html" class="nav-link">대시보드</a>
+          <a href="../agents/agents.html" class="nav-link">에이전트</a>
+          <a href="logs.html" class="nav-link active">로그</a>
+          <a href="../ruleset/ruleset.html" class="nav-link">룰셋</a>
+        </nav>
+      </header>
+
+      <main class="content-area">
+        <div class="content-wrapper">
+          <section id="logs" class="content-page active">
+            <div class="logs-grid">
+              <article class="widget">
+                <div class="widget-header-with-button">
+                  <h3 class="widget-title">검색 및 필터</h3>
+                  <div class="widget-actions">
+                    <button class="btn-secondary" id="refresh-logs">새로고침</button>
+                  </div>
+                </div>
+
+                <div class="filters">
+                  <div class="form-group">
+                    <label for="log-search">전체 텍스트 검색</label>
+                    <input
+                      type="search"
+                      id="log-search"
+                      placeholder="메시지, 에이전트, 정책 또는 플러그인으로 검색"
+                      autocomplete="off"
+                    />
+                  </div>
+
+                  <div class="filter-row">
+                    <div class="form-group">
+                      <label for="filter-agent">에이전트</label>
+                      <select id="filter-agent">
+                        <option value="all">모든 에이전트</option>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label for="filter-verdict">판정</label>
+                      <select id="filter-verdict">
+                        <option value="all">전체</option>
+                        <option value="pass">통과</option>
+                        <option value="violation">위반</option>
+                        <option value="blocked">차단</option>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label for="filter-timeframe">시간 범위</label>
+                      <select id="filter-timeframe">
+                        <option value="all">전체</option>
+                        <option value="15m">최근 15분</option>
+                        <option value="1h">최근 1시간</option>
+                        <option value="24h">최근 24시간</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="widget logs-results">
+                <div class="widget-header-with-button">
+                  <h3 class="widget-title">로그 탐색기</h3>
+                  <div class="widget-actions">
+                    <span class="pill" id="log-count">0건</span>
+                  </div>
+                </div>
+
+                <div class="log-table-wrapper">
+                  <table class="log-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">시간</th>
+                        <th scope="col">에이전트</th>
+                        <th scope="col">판정</th>
+                        <th scope="col">컨텍스트</th>
+                        <th scope="col">메시지</th>
+                        <th scope="col"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="logs-table-body">
+                      <tr>
+                        <td colspan="6" class="empty-state">로그를 불러오는 중…</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <template id="log-row-template">
+      <tr>
+        <td class="log-time"></td>
+        <td class="log-agent"></td>
+        <td class="log-verdict"></td>
+        <td class="log-context"></td>
+        <td class="log-message"></td>
+        <td class="log-actions">
+          <button class="btn-secondary btn-small">자세히</button>
+        </td>
+      </tr>
+    </template>
+
+    <div class="modal-overlay hidden" id="log-modal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="log-modal-title">
+        <div class="modal-header">
+          <h3 id="log-modal-title">로그 상세</h3>
+          <button class="btn-secondary" id="close-log-modal">닫기</button>
+        </div>
+        <div class="modal-content">
+          <pre id="log-modal-content"></pre>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

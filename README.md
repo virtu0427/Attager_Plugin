@@ -242,7 +242,9 @@ vehicle:fleet:availability       # 차량 가용성
 ```
 
 ### 샘플 데이터
-시스템은 시작 시 `agentDB/all_data_commands.txt`의 샘플 데이터를 Redis에 로드합니다.
+`docker compose up` 시 `agent-redis-seeder` 서비스가 `agentDB/seed_data.py`를 사용해 `agentDB/seed_data.txt`에 정의된 샘플 데이터를 에이전트용 Redis(`redis-agents`)에 자동으로 적재합니다. 이미 시드가 존재하면 재실행 시에도 중복 적재를 건너뜁니다.
+
+> ℹ️ **환경 분리**: 모든 에이전트 컨테이너는 `REDIS_HOST/PORT` 기본값 외에도 `AGENT_REDIS_HOST`, `AGENT_REDIS_PORT`, `AGENT_REDIS_DB` 환경변수로 별도의 Redis 인스턴스나 데이터베이스를 지정할 수 있습니다.
 
 ## 🛠️ 개발 가이드
 

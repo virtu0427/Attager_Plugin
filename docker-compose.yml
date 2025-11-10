@@ -47,6 +47,26 @@ services:
       timeout: 5s
       retries: 5
 
+  # Seed data for agent Redis
+  agent-redis-seeder:
+    build:
+      context: ./agentDB
+      dockerfile: Dockerfile.seeder
+    container_name: attager-agent-redis-seeder
+    depends_on:
+      redis-agents:
+        condition: service_healthy
+    environment:
+      - AGENT_REDIS_HOST=redis-agents
+      - AGENT_REDIS_PORT=6379
+      - AGENT_REDIS_DB=0
+      - AGENT_REDIS_WAIT_SECONDS=60
+    volumes:
+      - ./agentDB/seed_data.txt:/app/seed_data.txt:ro
+    networks:
+      - agent-network
+    restart: "no"
+
   # Redis for IAM Solution (IAM 솔루션 전용 Redis)
   redis-iam:
     image: redis:7-alpine
@@ -75,6 +95,7 @@ services:
     environment:
       - REDIS_HOST=redis-iam
       - REDIS_PORT=6379
+      - REDIS_DB=0
       - PORT=8005
     depends_on:
       redis-iam:
@@ -94,6 +115,7 @@ services:
     environment:
       - REDIS_HOST=redis-iam
       - REDIS_PORT=6379
+      - REDIS_DB=0
       - PORT=8006
     depends_on:
       redis-iam:
@@ -120,6 +142,8 @@ services:
     depends_on:
       redis-agents:
         condition: service_healthy
+      agent-redis-seeder:
+        condition: service_completed_successfully
       policy-server:
         condition: service_started
     networks:
@@ -142,6 +166,8 @@ services:
     depends_on:
       redis-agents:
         condition: service_healthy
+      agent-redis-seeder:
+        condition: service_completed_successfully
       policy-server:
         condition: service_started
     networks:
@@ -164,6 +190,8 @@ services:
     depends_on:
       redis-agents:
         condition: service_healthy
+      agent-redis-seeder:
+        condition: service_completed_successfully
       policy-server:
         condition: service_started
     networks:
@@ -186,6 +214,8 @@ services:
     depends_on:
       redis-agents:
         condition: service_healthy
+      agent-redis-seeder:
+        condition: service_completed_successfully
       policy-server:
         condition: service_started
     networks:

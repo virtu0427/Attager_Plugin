@@ -36,12 +36,17 @@ logger.setLevel(logging.DEBUG)
 
 # --- 1. AgentCard 로더 ---
 
+AGENT_REGISTRY_URL = os.getenv("AGENT_REGISTRY_URL", "http://localhost:8000")
+POLICY_SERVER_URL = os.getenv("POLICY_SERVER_URL", "http://localhost:8005")
+LOG_SERVER_URL = os.getenv("LOG_SERVER_URL", POLICY_SERVER_URL)
+
+
 def load_agent_cards(tool_context) -> List[str]:
     """
     레지스트리 서버에서 에이전트 카드 목록을 조회해서 state에 저장,
     에이전트 이름 리스트 반환
     """
-    url = "http://localhost:8000/agents"
+    url = f"{AGENT_REGISTRY_URL.rstrip('/')}/agents"
     resp = httpx.get(url)
     resp.raise_for_status()
     agents_data = resp.json()  # 레지스트리에서 내려주는 JSON 배열
@@ -135,8 +140,6 @@ root_agent = LlmAgent(
 # --- 5. IAM 기반 정책 플러그인 및 Runner 설정 ---
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")  # model_config.py와 동일한 환경변수 사용
-POLICY_SERVER_URL = "http://localhost:8005"
-LOG_SERVER_URL = "http://localhost:8005"
 
 # Orchestrator의 고유 agent_id
 AGENT_ID = "orchestrator"

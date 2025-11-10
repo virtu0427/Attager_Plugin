@@ -1,11 +1,19 @@
+import os
 import redis
 from datetime import datetime, timedelta
 import random
 
-# Redis 연결
-redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+
+def _get_redis_client() -> redis.Redis:
+    """Return a Redis client that honours environment overrides."""
+    host = os.getenv("AGENT_REDIS_HOST", os.getenv("REDIS_HOST", "localhost"))
+    port = int(os.getenv("AGENT_REDIS_PORT", os.getenv("REDIS_PORT", "6379")))
+    db = int(os.getenv("AGENT_REDIS_DB", os.getenv("REDIS_DB", "0")))
+
+    return redis.Redis(host=host, port=port, db=db, decode_responses=True)
 
 def seed_large_data(n=800):
+    redis_client = _get_redis_client()
     redis_client.flushdb()  # DB 초기화
     base_time = datetime(2025, 9, 25, 10, 0, 0)
 

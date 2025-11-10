@@ -16,9 +16,10 @@ CORS(app)
 # Redis connection settings from environment
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6380))
+REDIS_DB = int(os.getenv("REDIS_DB", 0))
 
 # Initialize database
-db = get_db(redis_host=REDIS_HOST, redis_port=REDIS_PORT)
+db = get_db(redis_host=REDIS_HOST, redis_port=REDIS_PORT, redis_db=REDIS_DB)
 
 # ========== Static Pages ==========
 @app.route('/')
@@ -133,6 +134,31 @@ def update_agent(agent_id: str):
             return jsonify({"message": "Agent updated successfully"}), 200
         else:
             return jsonify({"error": "Agent not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/agents/<agent_id>/policy', methods=['PUT'])
+def assign_agent_policy(agent_id: str):
+    """Assign IAM rulesets to an agent's policy"""
+    try:
+        data = request.json or {}
+
+        assignments = {
+            "prompt_validation_rulesets": data.get('prompt_validation_rulesets', []),
+            "tool_validation_rulesets": data.get('tool_validation_rulesets', []),
+            "response_filtering_rulesets": data.get('response_filtering_rulesets', [])
+        }
+
+        enabled = data.get('enabled')
+        if isinstance(enabled, str):
+            enabled = enabled.lower() == 'true'
+
+        success = db.assign_rulesets_to_agent(agent_id, assignments, enabled)
+
+        if success:
+            return jsonify({"message": "Agent policy updated"}), 200
+        return jsonify({"error": "Agent not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -333,6 +359,17 @@ def clear_logs():
             return jsonify({"message": "Logs cleared successfully"}), 200
         else:
             return jsonify({"error": "Failed to clear logs"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/graph/agent-flow', methods=['GET'])
+def get_agent_flow():
+    """Return aggregated agent flow data for visualisation"""
+    try:
+        limit = int(request.args.get('limit', 200))
+        flow = db.get_agent_flow(limit=limit)
+        return jsonify(flow), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
