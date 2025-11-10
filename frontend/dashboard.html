@@ -59,6 +59,9 @@
                   <h2 class="widget-title">운영 지표</h2>
                   <p class="widget-subtitle">등록 현황과 위험 지수</p>
                 </div>
+                <div class="widget-actions">
+                  <span class="pill" id="entity-selected">에이전트</span>
+                </div>
               </div>
               <div class="card-body">
                 <div class="stat-grid">
@@ -84,6 +87,15 @@
                   <div class="risk-score" id="risk-score">--</div>
                   <div class="risk-bar">
                     <div class="risk-bar-fill" id="risk-bar-fill"></div>
+                  </div>
+                </div>
+                <div class="entity-summary">
+                  <div class="chart-shell compact">
+                    <canvas id="entity-chart" aria-label="엔티티 분포" role="img"></canvas>
+                  </div>
+                  <div class="entity-details">
+                    <h3 class="entity-details__title" id="entity-detail-title">에이전트</h3>
+                    <ul class="entity-details__list" id="entity-detail-list"></ul>
                   </div>
                 </div>
               </div>

@@ -76,6 +76,12 @@ function setupControls() {
         closeModal(modal);
       }
     });
+    setupModalInteractivity(modal);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+        closeModal(modal);
+      }
+    });
   }
 }
 
@@ -278,9 +284,105 @@ function openModal(log) {
   if (!modal || !content) return;
 
   content.textContent = JSON.stringify(log, null, 2);
+  centerModal(modal.querySelector('.modal'));
   modal.classList.remove('hidden');
 }
 
 function closeModal(modal) {
+  const modalWindow = modal.querySelector('.modal');
+  if (modalWindow) {
+    modalWindow.classList.remove('is-dragging');
+    centerModal(modalWindow);
+  }
   modal.classList.add('hidden');
+}
+
+function setupModalInteractivity(overlay) {
+  const modalWindow = overlay.querySelector('.modal');
+  const header = modalWindow?.querySelector('.modal-header');
+  if (!modalWindow || !header) return;
+
+  const state = {
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startLeft: 0,
+    startTop: 0,
+  };
+
+  const clampPosition = (left, top) => {
+    const margin = 12;
+    const width = modalWindow.offsetWidth;
+    const height = modalWindow.offsetHeight;
+    const maxLeft = window.innerWidth - margin - width;
+    const maxTop = window.innerHeight - margin - height;
+
+    if (maxLeft < margin || maxTop < margin) {
+      centerModal(modalWindow);
+      return;
+    }
+
+    const clampedLeft = Math.min(Math.max(left, margin), maxLeft);
+    const clampedTop = Math.min(Math.max(top, margin), maxTop);
+
+    modalWindow.style.left = `${clampedLeft}px`;
+    modalWindow.style.top = `${clampedTop}px`;
+  };
+
+  const handlePointerMove = (event) => {
+    if (state.pointerId === null || event.pointerId !== state.pointerId) return;
+    const nextLeft = state.startLeft + (event.clientX - state.startX);
+    const nextTop = state.startTop + (event.clientY - state.startY);
+    clampPosition(nextLeft, nextTop);
+  };
+
+  const stopDrag = (event) => {
+    if (state.pointerId === null || event.pointerId !== state.pointerId) return;
+    header.releasePointerCapture(state.pointerId);
+    state.pointerId = null;
+    modalWindow.classList.remove('is-dragging');
+  };
+
+  header.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+
+    const rect = modalWindow.getBoundingClientRect();
+    modalWindow.dataset.position = 'custom';
+    modalWindow.style.transform = 'none';
+    modalWindow.style.left = `${rect.left}px`;
+    modalWindow.style.top = `${rect.top}px`;
+
+    state.pointerId = event.pointerId;
+    state.startX = event.clientX;
+    state.startY = event.clientY;
+    state.startLeft = rect.left;
+    state.startTop = rect.top;
+
+    modalWindow.classList.add('is-dragging');
+    header.setPointerCapture(state.pointerId);
+    event.preventDefault();
+  });
+
+  header.addEventListener('pointermove', handlePointerMove);
+  header.addEventListener('pointerup', stopDrag);
+  header.addEventListener('pointercancel', stopDrag);
+  header.addEventListener('dblclick', () => centerModal(modalWindow));
+
+  window.addEventListener('resize', () => {
+    if (overlay.classList.contains('hidden')) return;
+    if (modalWindow.dataset.position === 'custom') {
+      const rect = modalWindow.getBoundingClientRect();
+      clampPosition(rect.left, rect.top);
+    } else {
+      centerModal(modalWindow);
+    }
+  });
+}
+
+function centerModal(modalWindow) {
+  if (!modalWindow) return;
+  modalWindow.dataset.position = 'centered';
+  modalWindow.style.transform = 'translate(-50%, -50%)';
+  modalWindow.style.left = '50%';
+  modalWindow.style.top = '50%';
 }

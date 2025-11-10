@@ -2,6 +2,12 @@ const API_BASE = window.location.origin;
 const REFRESH_INTERVAL = 30000;
 
 let eventsChart;
+let entityChart;
+let cachedAgents = [];
+let cachedRulesets = [];
+let cachedLogs = [];
+let entitySummaryData = [];
+let entityDetailKey = 'agents';
 
 window.addEventListener('DOMContentLoaded', () => {
   setupControls();
@@ -39,10 +45,56 @@ function translateVerdict(verdict = '') {
   return verdict || '미확인';
 }
 
+function translateRulesetType(type = '') {
+  const normalised = (type || '').toLowerCase();
+  if (normalised === 'prompt_validation') return '프롬프트 검증';
+  if (normalised === 'tool_validation') return '툴 검증';
+  if (normalised === 'response_filtering') return '응답 필터링';
+  return type || '미확인';
+}
+
+function translateEnabled(enabled) {
+  return enabled ? '사용 중' : '중지';
+}
+
 function loadAll(manual = false) {
   loadDashboardStats();
+  loadEntitySummary();
   loadRecentLogs();
   loadAgentFlow(manual);
+}
+
+async function loadEntitySummary() {
+  let agents = [];
+  let rules = [];
+
+  try {
+    const response = await fetch(`${API_BASE}/api/agents`);
+    if (response.ok) {
+      const data = await response.json();
+      agents = Array.isArray(data) ? data : [];
+    } else {
+      throw new Error('에이전트 정보를 불러오지 못했습니다');
+    }
+  } catch (error) {
+    console.error('에이전트 정보를 불러오지 못했습니다', error);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/api/rulesets`);
+    if (response.ok) {
+      const data = await response.json();
+      rules = Array.isArray(data) ? data : [];
+    } else {
+      throw new Error('룰셋 정보를 불러오지 못했습니다');
+    }
+  } catch (error) {
+    console.error('룰셋 정보를 불러오지 못했습니다', error);
+  }
+
+  cachedAgents = agents;
+  cachedRulesets = rules;
+  renderEntityChart();
 }
 
 async function loadDashboardStats() {
@@ -92,8 +144,10 @@ async function loadRecentLogs() {
     if (!response.ok) throw new Error('로그를 불러오지 못했습니다');
     const logs = await response.json();
 
-    renderRecentLogs(logs.slice(0, 12));
-    updateEventsChart(logs);
+    cachedLogs = Array.isArray(logs) ? logs : [];
+    renderRecentLogs(cachedLogs.slice(0, 12));
+    updateEventsChart(cachedLogs);
+    renderEntityChart();
   } catch (error) {
     console.error('최근 로그를 불러오지 못했습니다', error);
   }
@@ -317,6 +371,264 @@ function renderAgentStatusList(nodes = []) {
 
     list.appendChild(item);
   });
+}
+
+function renderEntityChart() {
+  const canvas = document.getElementById('entity-chart');
+  const pill = document.getElementById('entity-selected');
+  if (!canvas || !pill) return;
+
+  const violations = cachedLogs.filter((log) =>
+    ['violation', 'blocked'].includes((log.verdict || '').toLowerCase())
+  );
+
+  entitySummaryData = [
+    {
+      key: 'agents',
+      label: '에이전트',
+      value: cachedAgents.length,
+      border: 'rgba(109, 211, 255, 0.95)',
+      background: 'rgba(109, 211, 255, 0.2)',
+    },
+    {
+      key: 'rulesets',
+      label: '룰셋',
+      value: cachedRulesets.length,
+      border: 'rgba(78, 246, 178, 0.95)',
+      background: 'rgba(78, 246, 178, 0.2)',
+    },
+    {
+      key: 'violations',
+      label: '위반 로그',
+      value: violations.length,
+      border: 'rgba(255, 170, 51, 0.95)',
+      background: 'rgba(255, 170, 51, 0.22)',
+    },
+  ];
+
+  if (!entitySummaryData.some((entry) => entry.key === entityDetailKey)) {
+    entityDetailKey = 'agents';
+  }
+
+  const labels = entitySummaryData.map((entry) => entry.label);
+  const values = entitySummaryData.map((entry) => entry.value);
+  const backgroundColors = entitySummaryData.map((entry) => entry.background);
+  const borderColors = entitySummaryData.map((entry) => entry.border);
+
+  if (!entityChart) {
+    entityChart = new Chart(canvas.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: backgroundColors,
+            borderColor: borderColors,
+            borderWidth: 1.5,
+            hoverOffset: 8,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '58%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label(context) {
+                const item = entitySummaryData[context.dataIndex];
+                const value = context.parsed;
+                return `${item.label}: ${value.toLocaleString()}`;
+              },
+            },
+          },
+        },
+      },
+    });
+
+    canvas.addEventListener('click', (event) => {
+      const points = entityChart.getElementsAtEventForMode(
+        event,
+        'nearest',
+        { intersect: true },
+        true
+      );
+
+      if (!points.length) return;
+      const selectedIndex = points[0].index;
+      const selected = entitySummaryData[selectedIndex];
+      if (selected) {
+        entityDetailKey = selected.key;
+        updateEntityDetails();
+      }
+    });
+  } else {
+    entityChart.data.labels = labels;
+    entityChart.data.datasets[0].data = values;
+    entityChart.data.datasets[0].backgroundColor = backgroundColors;
+    entityChart.data.datasets[0].borderColor = borderColors;
+    entityChart.update('none');
+  }
+
+  updateEntityDetails();
+}
+
+function updateEntityDetails() {
+  const detailList = document.getElementById('entity-detail-list');
+  const detailTitle = document.getElementById('entity-detail-title');
+  const pill = document.getElementById('entity-selected');
+  if (!detailList || !detailTitle || !pill) return;
+
+  const target =
+    entitySummaryData.find((entry) => entry.key === entityDetailKey && entry.value > 0) ||
+    entitySummaryData.find((entry) => entry.value > 0) ||
+    entitySummaryData[0];
+
+  if (!target) {
+    detailList.innerHTML = '';
+    return;
+  }
+
+  entityDetailKey = target.key;
+  pill.textContent = `${target.label} ${target.value.toLocaleString()}`;
+  detailTitle.textContent = `${target.label} 상세`;
+
+  const builders = {
+    agents: getAgentSummaryItems,
+    rulesets: getRulesetSummaryItems,
+    violations: getViolationSummaryItems,
+  };
+
+  const items = builders[target.key]?.() || [];
+
+  detailList.innerHTML = '';
+  if (items.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'entity-details__empty';
+    empty.textContent = `${target.label} 데이터가 없습니다.`;
+    detailList.appendChild(empty);
+    return;
+  }
+
+  items.forEach((item) => {
+    const listItem = document.createElement('li');
+    listItem.className = 'entity-details__item';
+
+    const info = document.createElement('div');
+    info.className = 'entity-details__info';
+
+    const title = document.createElement('strong');
+    title.textContent = item.title;
+    info.appendChild(title);
+
+    if (item.note) {
+      const note = document.createElement('span');
+      note.className = 'entity-details__note';
+      note.textContent = item.note;
+      info.appendChild(note);
+    }
+
+    const meta = document.createElement('span');
+    meta.className = 'entity-details__meta';
+    meta.textContent = item.meta || '';
+
+    listItem.appendChild(info);
+    listItem.appendChild(meta);
+    detailList.appendChild(listItem);
+  });
+}
+
+function getAgentSummaryItems() {
+  if (!Array.isArray(cachedAgents) || cachedAgents.length === 0) return [];
+
+  const statusPriority = {
+    active: 0,
+    warning: 1,
+    degraded: 1,
+    external: 2,
+    inactive: 3,
+  };
+
+  return cachedAgents
+    .slice()
+    .sort((a, b) => {
+      const statusA = statusPriority[(a.status || '').toLowerCase()] ?? 4;
+      const statusB = statusPriority[(b.status || '').toLowerCase()] ?? 4;
+      if (statusA !== statusB) return statusA - statusB;
+      return (a.name || a.agent_id || '').localeCompare(b.name || b.agent_id || '');
+    })
+    .slice(0, 6)
+    .map((agent) => {
+      const pluginCount = Array.isArray(agent.plugins) ? agent.plugins.length : 0;
+      const pluginLabel = pluginCount > 0 ? `플러그인 ${pluginCount}` : '플러그인 없음';
+      return {
+        title: agent.name || agent.agent_id || '알 수 없는 에이전트',
+        note: truncateText(agent.description, 54),
+        meta: `${translateStatus(agent.status)} · ${pluginLabel}`,
+      };
+    });
+}
+
+function getRulesetSummaryItems() {
+  if (!Array.isArray(cachedRulesets) || cachedRulesets.length === 0) return [];
+
+  return cachedRulesets
+    .slice()
+    .sort((a, b) => {
+      const aTime = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      return bTime - aTime;
+    })
+    .slice(0, 6)
+    .map((ruleset) => ({
+      title: ruleset.name || ruleset.ruleset_id || '룰셋',
+      note: `${translateRulesetType(ruleset.type)} · ${translateEnabled(ruleset.enabled)}`,
+      meta: formatDateTime(ruleset.updated_at || ruleset.created_at),
+    }));
+}
+
+function getViolationSummaryItems() {
+  const violations = cachedLogs.filter((log) =>
+    ['violation', 'blocked'].includes((log.verdict || '').toLowerCase())
+  );
+  if (violations.length === 0) return [];
+
+  return violations
+    .slice()
+    .sort((a, b) => {
+      const aTime = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const bTime = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return bTime - aTime;
+    })
+    .slice(0, 6)
+    .map((log) => ({
+      title: log.agent_id || '알 수 없는 에이전트',
+      note: `${log.policy_type || '정책 미지정'} · ${truncateText(log.message || log.action, 60) || '메시지 없음'}`,
+      meta: formatTime(log.timestamp),
+    }));
+}
+
+function truncateText(text, maxLength = 48) {
+  if (!text) return '';
+  const trimmed = text.trim();
+  return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength)}…` : trimmed;
+}
+
+function formatDateTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString();
+}
+
+function formatTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function renderAgentFlowGraph(flow) {
