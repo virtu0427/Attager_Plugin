@@ -17,6 +17,16 @@ window.addEventListener('DOMContentLoaded', () => {
   fetchLogs();
 });
 
+function translateVerdict(verdict = '') {
+  const normalized = verdict.toLowerCase();
+  if (normalized === 'pass') return '통과';
+  if (normalized === 'violation' || normalized === 'blocked') return '위반';
+  if (normalized === 'allow') return '허용';
+  if (normalized === 'deny') return '거부';
+  if (!verdict) return '미확인';
+  return verdict;
+}
+
 function setupControls() {
   const searchInput = document.getElementById('log-search');
   if (searchInput) {
@@ -73,12 +83,12 @@ async function fetchLogs(isManual = false) {
   const refreshButton = document.getElementById('refresh-logs');
   if (refreshButton && isManual) {
     refreshButton.disabled = true;
-    refreshButton.textContent = 'Refreshing…';
+    refreshButton.textContent = '새로고침 중…';
   }
 
   try {
     const response = await fetch(`${API_BASE}/api/logs?limit=${DEFAULT_LIMIT}`);
-    if (!response.ok) throw new Error('Failed to fetch logs');
+    if (!response.ok) throw new Error('로그를 불러오지 못했습니다');
     const logs = await response.json();
 
     logsCache = Array.isArray(logs) ? logs : [];
@@ -86,11 +96,11 @@ async function fetchLogs(isManual = false) {
     populateAgentFilter();
     renderResults();
   } catch (error) {
-    console.error('Failed to fetch logs', error);
+    console.error('로그를 불러오지 못했습니다', error);
   } finally {
     if (refreshButton) {
       refreshButton.disabled = false;
-      refreshButton.textContent = 'Refresh';
+      refreshButton.textContent = '새로고침';
     }
   }
 }
@@ -127,7 +137,7 @@ function populateAgentFilter() {
   const agents = new Set(indexedLogs.map((log) => log.agent_id).filter(Boolean));
   const current = select.value;
 
-  select.innerHTML = '<option value="all">All agents</option>';
+  select.innerHTML = '<option value="all">모든 에이전트</option>';
   Array.from(agents)
     .sort()
     .forEach((agent) => {
@@ -203,7 +213,7 @@ function applyFilters(log) {
 function updateCount(count) {
   const pill = document.getElementById('log-count');
   if (pill) {
-    pill.textContent = `${count} result${count === 1 ? '' : 's'}`;
+    pill.textContent = `${count}건`;
   }
 }
 
@@ -216,7 +226,7 @@ function renderTable(logs) {
 
   if (!logs || logs.length === 0) {
     const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="6" class="empty-state">No logs match the current filters.</td>';
+    row.innerHTML = '<td colspan="6" class="empty-state">조건에 맞는 로그가 없습니다.</td>';
     tbody.appendChild(row);
     return;
   }
@@ -231,21 +241,21 @@ function renderTable(logs) {
     const actionButton = clone.querySelector('button');
 
     if (timeCell) {
-      timeCell.textContent = log.timestamp ? new Date(log.timestamp).toLocaleString() : 'N/A';
+      timeCell.textContent = log.timestamp ? new Date(log.timestamp).toLocaleString() : '없음';
     }
     if (agentCell) {
-      agentCell.textContent = log.agent_id || 'unknown';
+      agentCell.textContent = log.agent_id || '알 수 없음';
     }
     if (verdictCell) {
-      const verdict = log.verdict || 'N/A';
-      verdictCell.innerHTML = `<span class="status-chip ${getVerdictClass(verdict)}">${verdict.toUpperCase()}</span>`;
+      const verdict = log.verdict || '미확인';
+      verdictCell.innerHTML = `<span class="status-chip ${getVerdictClass(verdict)}">${translateVerdict(verdict)}</span>`;
     }
     if (contextCell) {
       const context = [log.policy_type, log.target_agent, log.plugin].filter(Boolean).join(' · ');
-      contextCell.textContent = context || '—';
+      contextCell.textContent = context || '없음';
     }
     if (messageCell) {
-      messageCell.textContent = log.message || log.extra?.message || log.extra?.action || '—';
+      messageCell.textContent = log.message || log.extra?.message || log.extra?.action || '내용 없음';
     }
     if (actionButton) {
       actionButton.addEventListener('click', () => openModal(log.extra));

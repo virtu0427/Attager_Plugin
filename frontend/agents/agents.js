@@ -15,6 +15,24 @@ window.addEventListener('DOMContentLoaded', () => {
   initialise();
 });
 
+function getStatusLabel(status = '') {
+  const normalised = status.toLowerCase();
+  if (normalised === 'active') return '활성';
+  if (normalised === 'inactive') return '중지';
+  if (['warning', 'degraded'].includes(normalised)) return '주의';
+  if (normalised === 'external') return '외부';
+  return '미확인';
+}
+
+function formatDateTime(value) {
+  if (!value) return '생성 시각 미확인';
+  try {
+    return `생성 시간: ${new Date(value).toLocaleString()}`;
+  } catch (error) {
+    return '생성 시각 미확인';
+  }
+}
+
 async function initialise() {
   await Promise.all([loadAgents(), loadRulesets()]);
   bindSearch();
@@ -32,16 +50,16 @@ function bindSearch() {
 async function loadAgents() {
   try {
     const response = await fetch(`${API_BASE}/api/agents`);
-    if (!response.ok) throw new Error('Failed to load agents');
+    if (!response.ok) throw new Error('에이전트를 불러오지 못했습니다');
     const agents = await response.json();
 
     state.agents = Array.isArray(agents) ? agents : [];
     renderAgentList();
   } catch (error) {
-    console.error('Failed to load agents', error);
+    console.error('에이전트 목록을 불러오지 못했습니다', error);
     const list = document.getElementById('agent-list');
     if (list) {
-      list.innerHTML = '<li class="empty-state">Unable to load agents.</li>';
+      list.innerHTML = '<li class="empty-state">에이전트 목록을 불러올 수 없습니다.</li>';
     }
   }
 }
@@ -49,7 +67,7 @@ async function loadAgents() {
 async function loadRulesets() {
   try {
     const response = await fetch(`${API_BASE}/api/rulesets`);
-    if (!response.ok) throw new Error('Failed to load rulesets');
+    if (!response.ok) throw new Error('룰셋을 불러오지 못했습니다');
     const rulesets = await response.json();
 
     const grouped = {
@@ -70,7 +88,7 @@ async function loadRulesets() {
 
     state.rulesets = grouped;
   } catch (error) {
-    console.error('Failed to load rulesets', error);
+    console.error('룰셋을 불러오지 못했습니다', error);
   }
 }
 
@@ -91,7 +109,7 @@ function renderAgentList(filter = '') {
   });
 
   if (filteredAgents.length === 0) {
-    list.innerHTML = '<li class="empty-state">No agents match this search.</li>';
+    list.innerHTML = '<li class="empty-state">검색 조건과 일치하는 에이전트가 없습니다.</li>';
     return;
   }
 
@@ -112,7 +130,7 @@ function renderAgentList(filter = '') {
       }
       if (statusChip) {
         statusChip.classList.add(getStatusClass(agent.status));
-        statusChip.textContent = (agent.status || 'unknown').toUpperCase();
+        statusChip.textContent = getStatusLabel(agent.status || '');
       }
 
       element.dataset.agentId = agent.agent_id;
@@ -160,16 +178,16 @@ async function fetchAgentDetails(agentId) {
 
   try {
     const response = await fetch(`${API_BASE}/api/agents/${agentId}`);
-    if (!response.ok) throw new Error('Failed to fetch agent');
+    if (!response.ok) throw new Error('에이전트 정보를 가져오지 못했습니다');
     const agent = await response.json();
 
     state.agentCache.set(agentId, agent);
     return agent;
   } catch (error) {
-    console.error('Failed to fetch agent details', error);
+    console.error('에이전트 상세 정보를 불러오지 못했습니다', error);
     const container = document.getElementById('agent-details');
     if (container) {
-      container.innerHTML = '<div class="agent-error">Unable to load agent details.</div>';
+      container.innerHTML = '<div class="agent-error">에이전트 정보를 불러올 수 없습니다.</div>';
     }
     return null;
   }
@@ -200,12 +218,10 @@ function renderAgentDetails(agent) {
   }
   if (statusChip) {
     statusChip.classList.add(getStatusClass(agent.status));
-    statusChip.textContent = (agent.status || 'unknown').toUpperCase();
+    statusChip.textContent = getStatusLabel(agent.status || '');
   }
   if (created) {
-    created.textContent = agent.created_at
-      ? `Created ${new Date(agent.created_at).toLocaleString()}`
-      : 'Creation time unknown';
+    created.textContent = formatDateTime(agent.created_at);
   }
   if (pluginList) {
     renderPluginList(pluginList, agent.plugins);
@@ -231,7 +247,7 @@ function renderAgentDetails(agent) {
 function renderPluginList(listElement, plugins = []) {
   listElement.innerHTML = '';
   if (!plugins || plugins.length === 0) {
-    listElement.innerHTML = '<li class="empty-state">No plugins registered.</li>';
+    listElement.innerHTML = '<li class="empty-state">등록된 플러그인이 없습니다.</li>';
     return;
   }
 
@@ -242,11 +258,11 @@ function renderPluginList(listElement, plugins = []) {
       item.className = 'plugin-item';
       item.innerHTML = `
         <div>
-          <strong>${plugin.name || 'Plugin'}</strong>
+          <strong>${plugin.name || '플러그인'}</strong>
           ${plugin.type ? `<span class="pill">${plugin.type}</span>` : ''}
         </div>
         <span class="status-chip ${getStatusClass(plugin.status || 'active')}">
-          ${(plugin.status || 'active').toUpperCase()}
+          ${getStatusLabel(plugin.status || 'active')}
         </span>
       `;
       listElement.appendChild(item);
@@ -266,7 +282,7 @@ function populatePolicyColumns(root, policy) {
     const assigned = new Set(policy[`${type}_rulesets`] || []);
 
     if (available.length === 0) {
-      rulesetContainer.innerHTML = '<p class="empty-state">No rulesets available.</p>';
+      rulesetContainer.innerHTML = '<p class="empty-state">사용 가능한 룰셋이 없습니다.</p>';
       return;
     }
 
@@ -280,7 +296,7 @@ function populatePolicyColumns(root, policy) {
         } />
         <div class="ruleset-body">
           <span class="ruleset-name">${ruleset.name || ruleset.ruleset_id}</span>
-          <p class="ruleset-description">${ruleset.description || 'No description provided.'}</p>
+          <p class="ruleset-description">${ruleset.description || '설명이 제공되지 않았습니다.'}</p>
         </div>
       `;
       rulesetContainer.appendChild(wrapper);
@@ -301,10 +317,10 @@ async function savePolicy(agentId, form, statusElement) {
 
   if (submitButton) {
     submitButton.disabled = true;
-    submitButton.textContent = 'Saving…';
+    submitButton.textContent = '저장 중…';
   }
   if (statusElement) {
-    statusElement.textContent = 'Saving updates…';
+    statusElement.textContent = '변경 사항을 저장하는 중입니다…';
   }
 
   try {
@@ -316,7 +332,7 @@ async function savePolicy(agentId, form, statusElement) {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) throw new Error('Failed to update policy');
+    if (!response.ok) throw new Error('정책을 업데이트하지 못했습니다');
 
     // Refresh cached agent
     state.agentCache.delete(agentId);
@@ -326,19 +342,19 @@ async function savePolicy(agentId, form, statusElement) {
     }
 
     if (statusElement) {
-      statusElement.textContent = 'Policy assignments saved successfully.';
+      statusElement.textContent = '정책 연결을 저장했습니다.';
       statusElement.classList.remove('error');
     }
   } catch (error) {
-    console.error('Failed to save policy', error);
+    console.error('정책 저장에 실패했습니다', error);
     if (statusElement) {
-      statusElement.textContent = 'Failed to save policy assignments.';
+      statusElement.textContent = '정책 연결을 저장하지 못했습니다.';
       statusElement.classList.add('error');
     }
   } finally {
     if (submitButton) {
       submitButton.disabled = false;
-      submitButton.textContent = 'Save assignments';
+      submitButton.textContent = '저장';
     }
   }
 }

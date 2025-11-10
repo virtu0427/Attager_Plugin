@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>A2A Security Dashboard - Dashboard</title>
+    <title>A2A Security Dashboard - 대시보드</title>
     <link rel="stylesheet" href="style.css" />
     <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
@@ -14,10 +14,10 @@
       <header class="app-header">
         <div class="logo">A2A SECURE</div>
         <nav class="main-nav">
-          <a href="dashboard.html" class="nav-link active">Dashboard</a>
-          <a href="agents/agents.html" class="nav-link">Agents</a>
-          <a href="logs/logs.html" class="nav-link">Logs</a>
-          <a href="ruleset/ruleset.html" class="nav-link">Ruleset</a>
+          <a href="dashboard.html" class="nav-link active">대시보드</a>
+          <a href="agents/agents.html" class="nav-link">에이전트</a>
+          <a href="logs/logs.html" class="nav-link">로그</a>
+          <a href="ruleset/ruleset.html" class="nav-link">룰셋</a>
         </nav>
       </header>
 
@@ -26,10 +26,10 @@
           <div class="dashboard-grid">
             <article class="widget widget-agent-graph">
               <div class="widget-header-with-button">
-                <h3 class="widget-title">Agent Flow Graph</h3>
+                <h3 class="widget-title">에이전트 흐름 그래프</h3>
                 <div class="widget-actions">
-                  <span class="pill pill-live" id="flow-status">Syncing…</span>
-                  <button class="btn-secondary" id="refresh-flow">Refresh</button>
+                  <span class="pill pill-live" id="flow-status">동기화 중…</span>
+                  <button class="btn-secondary" id="refresh-flow">새로고침</button>
                 </div>
               </div>
               <div class="graph-container">
@@ -40,31 +40,31 @@
 
             <article class="widget widget-stats">
               <div class="widget-header-with-button">
-                <h3 class="widget-title">Operational Overview</h3>
+                <h3 class="widget-title">운영 개요</h3>
                 <div class="widget-actions">
-                  <button class="btn-secondary" id="refresh-dashboard">Refresh</button>
+                  <button class="btn-secondary" id="refresh-dashboard">새로고침</button>
                 </div>
               </div>
               <div class="stat-grid">
                 <div class="stat-card">
-                  <span class="label">Total Agents</span>
+                  <span class="label">총 에이전트</span>
                   <span class="value" id="total-agents">0</span>
                 </div>
                 <div class="stat-card">
-                  <span class="label">Total Rulesets</span>
+                  <span class="label">총 룰셋</span>
                   <span class="value" id="total-rulesets">0</span>
                 </div>
                 <div class="stat-card">
-                  <span class="label">Policy Violations (24h)</span>
+                  <span class="label">정책 위반 (24시간)</span>
                   <span class="value" id="total-violations">0</span>
                 </div>
                 <div class="stat-card">
-                  <span class="label">Events Indexed</span>
+                  <span class="label">수집된 이벤트</span>
                   <span class="value" id="total-events">0</span>
                 </div>
               </div>
               <div class="risk-indicator" id="risk-indicator">
-                <div class="risk-label">Risk Index</div>
+                <div class="risk-label">위험 지수</div>
                 <div class="risk-value" id="risk-score">--</div>
                 <div class="risk-bar">
                   <div class="risk-bar-fill" id="risk-bar-fill"></div>
@@ -74,9 +74,9 @@
 
             <article class="widget widget-traffic-stats">
               <div class="widget-header-with-button">
-                <h3 class="widget-title">Event Activity</h3>
+                <h3 class="widget-title">이벤트 활동</h3>
                 <div class="widget-actions">
-                  <span class="pill" id="chart-range">Last 60 minutes</span>
+                  <span class="pill" id="chart-range">최근 60분</span>
                 </div>
               </div>
               <canvas id="events-chart" height="220"></canvas>
@@ -84,9 +84,9 @@
 
             <article class="widget widget-agent-status">
               <div class="widget-header-with-button">
-                <h3 class="widget-title">Agent Health</h3>
+                <h3 class="widget-title">에이전트 상태</h3>
                 <div class="widget-actions">
-                  <a class="btn-secondary" href="agents/agents.html">Manage Agents</a>
+                  <a class="btn-secondary" href="agents/agents.html">에이전트 관리</a>
                 </div>
               </div>
               <ul class="agent-status-list" id="agent-status-list"></ul>
@@ -94,9 +94,9 @@
 
             <article class="widget widget-recent-logs">
               <div class="widget-header-with-button">
-                <h3 class="widget-title">Recent Enforcement Logs</h3>
+                <h3 class="widget-title">최근 정책 로그</h3>
                 <div class="widget-actions">
-                  <a class="btn-primary" href="logs/logs.html">Open Log Explorer</a>
+                  <a class="btn-primary" href="logs/logs.html">로그 탐색기 열기</a>
                 </div>
               </div>
               <div class="log-list" id="dashboard-log-list"></div>

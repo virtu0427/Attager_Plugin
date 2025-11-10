@@ -21,6 +21,24 @@ function setupControls() {
   }
 }
 
+function translateStatus(status = '') {
+  const normalised = (status || '').toLowerCase();
+  if (normalised === 'active') return '활성';
+  if (normalised === 'inactive') return '중지';
+  if (normalised === 'external') return '외부';
+  if (['warning', 'degraded'].includes(normalised)) return '주의';
+  return '미확인';
+}
+
+function translateVerdict(verdict = '') {
+  const normalised = (verdict || '').toLowerCase();
+  if (normalised === 'pass') return '통과';
+  if (['violation', 'blocked'].includes(normalised)) return '위반';
+  if (normalised === 'allow') return '허용';
+  if (normalised === 'deny') return '거부';
+  return verdict || '미확인';
+}
+
 function loadAll(manual = false) {
   loadDashboardStats();
   loadRecentLogs();
@@ -30,7 +48,7 @@ function loadAll(manual = false) {
 async function loadDashboardStats() {
   try {
     const response = await fetch(`${API_BASE}/api/stats`);
-    if (!response.ok) throw new Error('Failed to load stats');
+    if (!response.ok) throw new Error('통계 정보를 불러오지 못했습니다');
     const stats = await response.json();
 
     updateStatCard('total-agents', stats.total_agents ?? 0);
@@ -40,7 +58,7 @@ async function loadDashboardStats() {
 
     updateRiskIndicator(stats);
   } catch (error) {
-    console.error('Failed to load dashboard stats', error);
+    console.error('대시보드 통계를 불러오지 못했습니다', error);
   }
 }
 
@@ -71,13 +89,13 @@ function updateRiskIndicator(stats) {
 async function loadRecentLogs() {
   try {
     const response = await fetch(`${API_BASE}/api/logs?limit=120`);
-    if (!response.ok) throw new Error('Failed to load logs');
+    if (!response.ok) throw new Error('로그를 불러오지 못했습니다');
     const logs = await response.json();
 
     renderRecentLogs(logs.slice(0, 12));
     updateEventsChart(logs);
   } catch (error) {
-    console.error('Failed to load recent logs', error);
+    console.error('최근 로그를 불러오지 못했습니다', error);
   }
 }
 
@@ -88,7 +106,7 @@ function renderRecentLogs(logs) {
   container.innerHTML = '';
 
   if (!logs || logs.length === 0) {
-    container.innerHTML = `<p style="color: var(--text-secondary); text-align: center;">No recent activity</p>`;
+    container.innerHTML = `<p style="color: var(--text-secondary); text-align: center;">최근 활동이 없습니다</p>`;
     return;
   }
 
@@ -105,14 +123,14 @@ function renderRecentLogs(logs) {
     entry.innerHTML = `
       <div class="log-header">
         <div>
-          <strong>${log.agent_id || 'Unknown Agent'}</strong>
-          <span class="pill" style="margin-left: 0.5rem;">${log.policy_type || 'policy'}</span>
+          <strong>${log.agent_id || '알 수 없는 에이전트'}</strong>
+          <span class="pill" style="margin-left: 0.5rem;">${log.policy_type || '정책'}</span>
         </div>
         <span class="status-chip ${log.verdict && log.verdict.toUpperCase() === 'VIOLATION' ? 'status-inactive' : 'status-active'}">
-          ${log.verdict || 'N/A'}
+          ${translateVerdict(log.verdict)}
         </span>
       </div>
-      <div class="log-message">${log.message || log.action || 'No message provided'}</div>
+      <div class="log-message">${log.message || log.action || '메시지가 제공되지 않았습니다'}</div>
       <div class="log-meta">
         <span>${formattedTime}</span>
         ${log.target_agent ? `<span>→ ${log.target_agent}</span>` : ''}
@@ -166,7 +184,7 @@ function updateEventsChart(logs) {
 
   const chartRange = document.getElementById('chart-range');
   if (chartRange) {
-    chartRange.textContent = `Last ${buckets.length} minutes`;
+    chartRange.textContent = `최근 ${buckets.length}분`;
   }
 
   if (!eventsChart) {
@@ -176,7 +194,7 @@ function updateEventsChart(logs) {
         labels,
         datasets: [
           {
-            label: 'Events',
+            label: '이벤트',
             data: eventSeries,
             borderColor: 'rgba(109, 211, 255, 0.85)',
             backgroundColor: 'rgba(109, 211, 255, 0.1)',
@@ -184,7 +202,7 @@ function updateEventsChart(logs) {
             fill: true,
           },
           {
-            label: 'Violations',
+            label: '위반',
             data: violationSeries,
             borderColor: 'rgba(255, 77, 79, 0.9)',
             backgroundColor: 'rgba(255, 77, 79, 0.15)',
@@ -229,12 +247,12 @@ function updateEventsChart(logs) {
 async function loadAgentFlow(manual = false) {
   const statusPill = document.getElementById('flow-status');
   if (statusPill && manual) {
-    statusPill.textContent = 'Refreshing…';
+    statusPill.textContent = '수동 새로고침 중…';
   }
 
   try {
     const response = await fetch(`${API_BASE}/api/graph/agent-flow?limit=200`);
-    if (!response.ok) throw new Error('Failed to load agent flow');
+    if (!response.ok) throw new Error('에이전트 흐름을 불러오지 못했습니다');
     const flow = await response.json();
 
     renderAgentFlowGraph(flow);
@@ -244,12 +262,12 @@ async function loadAgentFlow(manual = false) {
       const updatedAt = flow.meta?.generated_at
         ? new Date(flow.meta.generated_at).toLocaleTimeString()
         : new Date().toLocaleTimeString();
-      statusPill.textContent = `Updated ${updatedAt}`;
+      statusPill.textContent = `${updatedAt} 갱신`;
     }
   } catch (error) {
-    console.error('Failed to load agent flow', error);
+    console.error('에이전트 흐름을 불러오지 못했습니다', error);
     if (statusPill) {
-      statusPill.textContent = 'Sync failed';
+      statusPill.textContent = '동기화 실패';
     }
   }
 }
@@ -264,7 +282,7 @@ function renderAgentStatusList(nodes = []) {
   list.innerHTML = '';
 
   if (knownAgents.length === 0) {
-    list.innerHTML = `<li style="color: var(--text-secondary);">No agent telemetry available.</li>`;
+    list.innerHTML = `<li style="color: var(--text-secondary);">에이전트 데이터가 없습니다.</li>`;
     return;
   }
 
@@ -287,12 +305,12 @@ function renderAgentStatusList(nodes = []) {
     item.innerHTML = `
       <div class="agent-meta">
         <span class="name">${node.name || node.id}</span>
-        <span class="plugins">${plugins || 'No plugins registered'}</span>
+        <span class="plugins">${plugins || '등록된 플러그인이 없습니다'}</span>
       </div>
       <div class="agent-metrics">
-        <span class="status-chip ${statusClass}">${status.toUpperCase()}</span>
-        <span class="pill">${metrics.events || 0} events</span>
-        <span class="pill">${metrics.violations || 0} violations</span>
+        <span class="status-chip ${statusClass}">${translateStatus(status)}</span>
+        <span class="pill">이벤트 ${metrics.events || 0}</span>
+        <span class="pill">위반 ${metrics.violations || 0}</span>
       </div>
     `;
 
@@ -408,11 +426,11 @@ function renderAgentFlowGraph(flow) {
 
     tooltip.innerHTML = `
       <div class="tooltip-title">${node.name || node.id}</div>
-      <div class="tooltip-meta">${(node.status || 'unknown').toUpperCase()}</div>
+      <div class="tooltip-meta">${translateStatus(node.status)}</div>
       <ul>
-        <li><strong>${metrics.events || 0}</strong> recent events</li>
-        <li><strong>${metrics.violations || 0}</strong> violations</li>
-        <li><strong>${plugins.length}</strong> plugins</li>
+        <li><strong>${metrics.events || 0}</strong>건의 최근 이벤트</li>
+        <li><strong>${metrics.violations || 0}</strong>건의 위반</li>
+        <li><strong>${plugins.length}</strong>개의 플러그인</li>
       </ul>
     `;
   }

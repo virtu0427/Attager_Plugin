@@ -7,6 +7,19 @@ window.addEventListener('DOMContentLoaded', () => {
   bindControls();
 });
 
+function getTypeLabel(type = '') {
+  const map = {
+    prompt_validation: '프롬프트 검증',
+    tool_validation: '툴 검증',
+    response_filtering: '응답 필터링',
+  };
+  return map[type] || type || '미확인';
+}
+
+function getStatusLabel(enabled) {
+  return enabled ? '사용 중' : '중지';
+}
+
 function bindControls() {
   const createButton = document.getElementById('open-create-ruleset');
   if (createButton) {
@@ -30,14 +43,14 @@ function bindControls() {
 async function loadRulesets() {
   try {
     const response = await fetch(`${API_BASE}/api/rulesets`);
-    if (!response.ok) throw new Error('Failed to load rulesets');
+    if (!response.ok) throw new Error('룰셋을 불러오지 못했습니다');
     rulesets = await response.json();
     renderRulesetTable();
   } catch (error) {
-    console.error('Failed to load rulesets', error);
+    console.error('룰셋을 불러오지 못했습니다', error);
     const tbody = document.getElementById('ruleset-table-body');
     if (tbody) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Unable to load rulesets.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">룰셋을 불러올 수 없습니다.</td></tr>';
     }
   }
 }
@@ -50,7 +63,7 @@ function renderRulesetTable() {
   tbody.innerHTML = '';
 
   if (!rulesets || rulesets.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No rulesets defined yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">등록된 룰셋이 없습니다.</td></tr>';
     return;
   }
 
@@ -61,13 +74,13 @@ function renderRulesetTable() {
       const clone = template.content.cloneNode(true);
       clone.querySelector('.ruleset-id').textContent = ruleset.ruleset_id;
       clone.querySelector('.ruleset-name').textContent = ruleset.name || ruleset.ruleset_id;
-      clone.querySelector('.ruleset-type').textContent = formatType(ruleset.type);
+      clone.querySelector('.ruleset-type').textContent = getTypeLabel(ruleset.type);
 
       const statusCell = clone.querySelector('.ruleset-status');
       if (statusCell) {
         const chip = document.createElement('span');
         chip.className = `status-chip ${ruleset.enabled ? 'status-active' : 'status-inactive'}`;
-        chip.textContent = ruleset.enabled ? 'ACTIVE' : 'INACTIVE';
+        chip.textContent = getStatusLabel(ruleset.enabled);
         statusCell.appendChild(chip);
       }
 
@@ -84,17 +97,8 @@ function renderRulesetTable() {
     });
 }
 
-function formatType(type) {
-  const map = {
-    prompt_validation: 'Prompt validation',
-    tool_validation: 'Tool validation',
-    response_filtering: 'Response filtering',
-  };
-  return map[type] || type || 'Unknown';
-}
-
 function formatDate(dateString) {
-  if (!dateString) return '—';
+  if (!dateString) return '없음';
   return new Date(dateString).toLocaleString();
 }
 
@@ -111,10 +115,10 @@ function openDetailModal(ruleset) {
   const node = template.content.cloneNode(true);
   const wrapper = node.querySelector('.ruleset-detail');
   wrapper.querySelector('[data-field="ruleset_id"]').textContent = ruleset.ruleset_id;
-  wrapper.querySelector('[data-field="type"]').textContent = formatType(ruleset.type);
-  wrapper.querySelector('[data-field="status"]').textContent = ruleset.enabled ? 'Enabled' : 'Disabled';
+  wrapper.querySelector('[data-field="type"]').textContent = getTypeLabel(ruleset.type);
+  wrapper.querySelector('[data-field="status"]').textContent = getStatusLabel(ruleset.enabled);
   wrapper.querySelector('[data-field="updated"]').textContent = formatDate(ruleset.updated_at || ruleset.created_at);
-  wrapper.querySelector('[data-field="description"]').textContent = ruleset.description || 'No description provided.';
+  wrapper.querySelector('[data-field="description"]').textContent = ruleset.description || '설명이 제공되지 않았습니다.';
 
   const configuration = { ...ruleset };
   wrapper.querySelector('[data-field="json"]').textContent = JSON.stringify(configuration, null, 2);
@@ -137,11 +141,11 @@ function openFormModal(ruleset) {
   const statusMessage = node.querySelector('#ruleset-form-status');
 
   if (ruleset) {
-    title.textContent = 'Edit ruleset';
+    title.textContent = '룰셋 수정';
     populateForm(form, ruleset);
     form.dataset.mode = 'edit';
   } else {
-    title.textContent = 'Create ruleset';
+    title.textContent = '룰셋 생성';
     form.dataset.mode = 'create';
   }
 
@@ -206,12 +210,12 @@ async function submitForm(form, statusElement, existing) {
   }
 
   if (statusElement) {
-    statusElement.textContent = 'Saving…';
+    statusElement.textContent = '저장 중…';
     statusElement.classList.remove('error');
   }
   if (submitButton) {
     submitButton.disabled = true;
-    submitButton.textContent = 'Saving…';
+    submitButton.textContent = '저장 중…';
   }
 
   try {
@@ -226,20 +230,20 @@ async function submitForm(form, statusElement, existing) {
       body: JSON.stringify(payload),
     });
 
-    if (!response.ok) throw new Error('Failed to save ruleset');
+    if (!response.ok) throw new Error('룰셋을 저장하지 못했습니다');
 
     await loadRulesets();
     closeModal();
   } catch (error) {
-    console.error('Failed to save ruleset', error);
+    console.error('룰셋 저장에 실패했습니다', error);
     if (statusElement) {
-      statusElement.textContent = 'Unable to save ruleset. Check input values.';
+      statusElement.textContent = '룰셋을 저장할 수 없습니다. 입력 값을 확인하세요.';
       statusElement.classList.add('error');
     }
   } finally {
     if (submitButton) {
       submitButton.disabled = false;
-      submitButton.textContent = 'Save ruleset';
+      submitButton.textContent = '룰셋 저장';
     }
   }
 }
@@ -249,13 +253,13 @@ function safeJsonParse(value) {
   try {
     return JSON.parse(value);
   } catch (error) {
-    console.warn('Invalid JSON input', value);
+    console.warn('올바르지 않은 JSON 입력', value);
     return undefined;
   }
 }
 
 function confirmDelete(ruleset) {
-  if (!confirm(`Delete ruleset ${ruleset.ruleset_id}?`)) return;
+  if (!confirm(`룰셋 ${ruleset.ruleset_id}을(를) 삭제할까요?`)) return;
   deleteRuleset(ruleset.ruleset_id);
 }
 
@@ -264,11 +268,11 @@ async function deleteRuleset(rulesetId) {
     const response = await fetch(`${API_BASE}/api/rulesets/${encodeURIComponent(rulesetId)}`, {
       method: 'DELETE',
     });
-    if (!response.ok) throw new Error('Failed to delete ruleset');
+    if (!response.ok) throw new Error('룰셋을 삭제하지 못했습니다');
     await loadRulesets();
   } catch (error) {
-    console.error('Failed to delete ruleset', error);
-    alert('Unable to delete ruleset.');
+    console.error('룰셋 삭제에 실패했습니다', error);
+    alert('룰셋을 삭제하지 못했습니다.');
   }
 }
 

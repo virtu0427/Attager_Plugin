@@ -34,7 +34,7 @@
 
 html,
 body {
-  height: 100%;
+  min-height: 100vh;
   font-family: var(--font-family);
   background-color: var(--bg-dark-primary);
   color: var(--text-primary);
@@ -211,8 +211,17 @@ button:disabled,
 /* === 메인 컨텐츠 영역 === */
 .content-area {
   flex-grow: 1;
-  padding: 2rem;
+  padding: 1.5rem;
   overflow-y: auto; /* 컨텐츠가 많아지면 스크롤 */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.content-area > .content-page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .content-page {
@@ -264,7 +273,6 @@ textarea {
   box-shadow: var(--shadow-md);
   transition: transform 0.2s ease-out, box-shadow 0.2s ease-out,
     border-color 0.2s ease-out;
-  margin-bottom: 2rem; /* Grid 사용 시 gap으로 대체) */
 }
 
 /* Grid 레이아웃 내의 위젯은 margin-bottom 제거 (#ruleset 추가됨) */
@@ -329,15 +337,14 @@ textarea {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr);
-  grid-auto-rows: minmax(0, auto);
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  align-items: stretch;
 }
 
 .widget-agent-graph {
-  grid-column: 1 / 2;
-  grid-row: span 2;
-  min-height: 520px;
+  grid-column: span 2;
+  min-height: 420px;
   position: relative;
 }
 
@@ -434,11 +441,6 @@ textarea {
   gap: 0.35rem;
 }
 
-.widget-stats {
-  grid-column: 2 / 3;
-  grid-row: 1 / 2;
-}
-
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -502,19 +504,10 @@ textarea {
   transition: width 0.3s ease;
 }
 
-.widget-traffic-stats {
-  grid-column: 2 / 3;
-  grid-row: 2 / 3;
-}
-
-.widget-agent-status {
-  grid-column: 1 / 2;
-  grid-row: 3 / 4;
-}
-
+.widget-traffic-stats,
+.widget-agent-status,
 .widget-recent-logs {
-  grid-column: 2 / 3;
-  grid-row: 3 / 4;
+  min-height: 280px;
 }
 
 .agent-status-list {
@@ -524,6 +517,24 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+}
+
+@media (max-width: 1100px) {
+  .widget-agent-graph {
+    grid-column: span 1;
+    min-height: 360px;
+  }
+}
+
+@media (max-width: 768px) {
+  .content-area {
+    padding: 1rem;
+  }
+
+  .widget {
+    padding: 1.25rem;
+    border-radius: 1rem;
+  }
 }
 
 .agent-status-item {

@@ -1,13 +1,15 @@
 .agents-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr);
-  gap: 2rem;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.4fr);
+  gap: 1.5rem;
+  align-items: start;
 }
 
 .agent-sidebar {
   padding: 0;
   display: flex;
   flex-direction: column;
+  min-height: 100%;
 }
 
 .agent-sidebar .widget-header-with-button {
@@ -17,14 +19,14 @@
 }
 
 .agent-sidebar .widget-actions input {
-  width: 220px;
+  width: 100%;
 }
 
 .agent-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 70vh;
+  flex: 1;
   overflow-y: auto;
 }
 
@@ -66,7 +68,8 @@
 .agent-details {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 1.5rem;
+  min-height: 100%;
 }
 
 .agent-details-placeholder {
@@ -75,7 +78,8 @@
   display: grid;
   place-content: center;
   gap: 0.75rem;
-  min-height: 480px;
+  min-height: 360px;
+  padding: 2rem 1rem;
 }
 
 .agent-overview {
@@ -88,7 +92,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: 1.25rem;
+  flex-wrap: wrap;
 }
 
 .overview-meta {
@@ -96,6 +101,7 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 0.5rem;
+  min-width: 160px;
 }
 
 .plugins-panel {
@@ -103,6 +109,7 @@
   border-radius: 1rem;
   padding: 1.25rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 180px;
 }
 
 .plugin-list {
@@ -133,6 +140,7 @@
   background: rgba(255, 255, 255, 0.05);
   border-radius: 1.25rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 220px;
 }
 
 .policy-header {
@@ -233,10 +241,11 @@
 
 @media (max-width: 1080px) {
   .agents-layout {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
   }
 
   .agent-sidebar {
-    max-height: 420px;
+    max-height: none;
   }
 }

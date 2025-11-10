@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>A2A Security Dashboard - Agents</title>
+    <title>A2A Security Dashboard - 에이전트</title>
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="style.css" />
     <script src="agents.js" defer></script>
@@ -13,10 +13,10 @@
       <header class="app-header">
         <div class="logo">A2A SECURE</div>
         <nav class="main-nav">
-          <a href="../dashboard.html" class="nav-link">Dashboard</a>
-          <a href="agents.html" class="nav-link active">Agents</a>
-          <a href="../logs/logs.html" class="nav-link">Logs</a>
-          <a href="../ruleset/ruleset.html" class="nav-link">Ruleset</a>
+          <a href="../dashboard.html" class="nav-link">대시보드</a>
+          <a href="agents.html" class="nav-link active">에이전트</a>
+          <a href="../logs/logs.html" class="nav-link">로그</a>
+          <a href="../ruleset/ruleset.html" class="nav-link">룰셋</a>
         </nav>
       </header>
 
@@ -25,25 +25,25 @@
           <div class="agents-layout">
             <aside class="widget agent-sidebar">
               <div class="widget-header-with-button">
-                <h3 class="widget-title">Agents</h3>
+                <h3 class="widget-title">에이전트 목록</h3>
                 <div class="widget-actions">
                   <input
                     type="search"
                     id="agent-search"
-                    placeholder="Search agents"
+                    placeholder="에이전트 검색"
                     autocomplete="off"
                   />
                 </div>
               </div>
               <ul class="agent-list" id="agent-list">
-                <li class="empty-state">Loading agents…</li>
+                <li class="empty-state">에이전트를 불러오는 중…</li>
               </ul>
             </aside>
 
             <article class="widget agent-details" id="agent-details">
               <div class="agent-details-placeholder">
-                <h3>Select an agent</h3>
-                <p>Choose an agent from the list to review plugins and IAM ruleset assignments.</p>
+                <h3>에이전트를 선택하세요</h3>
+                <p>왼쪽 목록에서 에이전트를 선택하면 플러그인과 IAM 룰셋 연결을 확인할 수 있습니다.</p>
               </div>
             </article>
           </div>
@@ -75,45 +75,45 @@
         </div>
 
         <div class="plugins-panel">
-          <h3>Installed plugins</h3>
+          <h3>설치된 플러그인</h3>
           <ul class="plugin-list"></ul>
         </div>
       </div>
 
       <form class="policy-editor" id="policy-editor">
         <div class="policy-header">
-          <h3>IAM policy assignments</h3>
+          <h3>IAM 정책 연결</h3>
           <label class="toggle">
             <input type="checkbox" id="policy-enabled" />
-            <span>Policy enabled</span>
+            <span>IAM 정책 사용</span>
           </label>
         </div>
 
         <div class="policy-columns">
           <div class="policy-column" data-policy-type="prompt_validation">
-            <h4>Prompt validation</h4>
+            <h4>프롬프트 검증</h4>
             <p class="policy-description">
-              Assign rulesets that validate inbound prompts before execution.
+              실행 전에 입력 프롬프트를 검증하는 룰셋을 연결합니다.
             </p>
             <div class="ruleset-list"></div>
           </div>
 
           <div class="policy-column" data-policy-type="tool_validation">
-            <h4>Tool validation</h4>
-            <p class="policy-description">Control tool invocation and validate arguments.</p>
+            <h4>툴 검증</h4>
+            <p class="policy-description">툴 호출을 제어하고 전달되는 인자를 검증합니다.</p>
             <div class="ruleset-list"></div>
           </div>
 
           <div class="policy-column" data-policy-type="response_filtering">
-            <h4>Response filtering</h4>
-            <p class="policy-description">Filter or redact generated responses.</p>
+            <h4>응답 필터링</h4>
+            <p class="policy-description">생성된 응답을 필터링하거나 민감 정보를 가립니다.</p>
             <div class="ruleset-list"></div>
           </div>
         </div>
 
         <div class="policy-actions">
           <span class="status-message" id="policy-status" role="status"></span>
-          <button type="submit" class="btn-primary">Save assignments</button>
+          <button type="submit" class="btn-primary">저장</button>
         </div>
       </form>
     </template>
