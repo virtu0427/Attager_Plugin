@@ -23,29 +23,44 @@
 
       <main class="content-area">
         <div class="content-wrapper">
-          <section id="dashboard" class="content-page active">
-            <div class="dashboard-grid">
-              <article class="widget widget-agent-graph">
-                <div class="widget-header-with-button">
-                  <h3 class="widget-title">에이전트 흐름 그래프</h3>
-                  <div class="widget-actions">
-                    <span class="pill pill-live" id="flow-status">동기화 중…</span>
-                    <button class="btn-secondary" id="refresh-flow">새로고침</button>
-                  </div>
+          <header class="dashboard-header">
+            <div class="dashboard-header__text">
+              <h1>보안 운영 현황</h1>
+              <p>에이전트 흐름, 정책 로그, 트래픽 상태를 실시간으로 확인합니다.</p>
+            </div>
+            <div class="dashboard-header__actions">
+              <button class="btn-secondary" id="refresh-dashboard">전체 새로고침</button>
+            </div>
+          </header>
+
+          <section class="dashboard-layout">
+            <article class="widget dashboard-card span-8" data-card="flow">
+              <div class="widget-header-with-button">
+                <div>
+                  <h2 class="widget-title">에이전트 흐름</h2>
+                  <p class="widget-subtitle">연결 관계와 정책 적용 현황</p>
                 </div>
-                <div class="graph-container">
+                <div class="widget-actions">
+                  <span class="pill pill-live" id="flow-status">동기화 중…</span>
+                  <button class="btn-secondary" id="refresh-flow">그래프 새로고침</button>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="graph-shell">
                   <div id="graph-tooltip" class="graph-tooltip hidden"></div>
                   <svg id="agent-flow-graph" role="presentation"></svg>
                 </div>
-              </article>
+              </div>
+            </article>
 
-              <article class="widget widget-stats">
-                <div class="widget-header-with-button">
-                  <h3 class="widget-title">운영 개요</h3>
-                  <div class="widget-actions">
-                    <button class="btn-secondary" id="refresh-dashboard">새로고침</button>
-                  </div>
+            <article class="widget dashboard-card span-4" data-card="stats">
+              <div class="widget-header-with-button">
+                <div>
+                  <h2 class="widget-title">운영 지표</h2>
+                  <p class="widget-subtitle">등록 현황과 위험 지수</p>
                 </div>
+              </div>
+              <div class="card-body">
                 <div class="stat-grid">
                   <div class="stat-card">
                     <span class="label">총 에이전트</span>
@@ -64,45 +79,62 @@
                     <span class="value" id="total-events">0</span>
                   </div>
                 </div>
-                <div class="risk-indicator" id="risk-indicator">
+                <div class="risk-meter" id="risk-indicator">
                   <div class="risk-label">위험 지수</div>
-                  <div class="risk-value" id="risk-score">--</div>
+                  <div class="risk-score" id="risk-score">--</div>
                   <div class="risk-bar">
                     <div class="risk-bar-fill" id="risk-bar-fill"></div>
                   </div>
                 </div>
-              </article>
+              </div>
+            </article>
 
-              <article class="widget widget-traffic-stats">
-                <div class="widget-header-with-button">
-                  <h3 class="widget-title">이벤트 활동</h3>
-                  <div class="widget-actions">
-                    <span class="pill" id="chart-range">최근 60분</span>
-                  </div>
+            <article class="widget dashboard-card span-6" data-card="traffic">
+              <div class="widget-header-with-button">
+                <div>
+                  <h2 class="widget-title">이벤트 활동</h2>
+                  <p class="widget-subtitle">최근 60분 이벤트와 위반 추이</p>
                 </div>
-                <canvas id="events-chart" height="220"></canvas>
-              </article>
+                <div class="widget-actions">
+                  <span class="pill" id="chart-range">최근 60분</span>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="chart-shell">
+                  <canvas id="events-chart"></canvas>
+                </div>
+              </div>
+            </article>
 
-              <article class="widget widget-agent-status">
-                <div class="widget-header-with-button">
-                  <h3 class="widget-title">에이전트 상태</h3>
-                  <div class="widget-actions">
-                    <a class="btn-secondary" href="agents/agents.html">에이전트 관리</a>
-                  </div>
+            <article class="widget dashboard-card span-6" data-card="agents">
+              <div class="widget-header-with-button">
+                <div>
+                  <h2 class="widget-title">에이전트 상태</h2>
+                  <p class="widget-subtitle">가동 중인 에이전트와 정책 위반</p>
                 </div>
+                <div class="widget-actions">
+                  <a class="btn-secondary" href="agents/agents.html">에이전트 관리</a>
+                </div>
+              </div>
+              <div class="card-body">
                 <ul class="agent-status-list" id="agent-status-list"></ul>
-              </article>
+              </div>
+            </article>
 
-              <article class="widget widget-recent-logs">
-                <div class="widget-header-with-button">
-                  <h3 class="widget-title">최근 정책 로그</h3>
-                  <div class="widget-actions">
-                    <a class="btn-primary" href="logs/logs.html">로그 탐색기 열기</a>
-                  </div>
+            <article class="widget dashboard-card span-12" data-card="logs">
+              <div class="widget-header-with-button">
+                <div>
+                  <h2 class="widget-title">최근 정책 로그</h2>
+                  <p class="widget-subtitle">실시간 정책 결과와 메시지</p>
                 </div>
+                <div class="widget-actions">
+                  <a class="btn-primary" href="logs/logs.html">로그 탐색기 열기</a>
+                </div>
+              </div>
+              <div class="card-body">
                 <div class="log-list" id="dashboard-log-list"></div>
-              </article>
-            </div>
+              </div>
+            </article>
           </section>
         </div>
       </main>

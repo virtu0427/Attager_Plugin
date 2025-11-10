@@ -104,9 +104,10 @@ function renderRecentLogs(logs) {
   if (!container) return;
 
   container.innerHTML = '';
+  container.scrollTop = 0;
 
   if (!logs || logs.length === 0) {
-    container.innerHTML = `<p style="color: var(--text-secondary); text-align: center;">최근 활동이 없습니다</p>`;
+    container.innerHTML = '<div class="empty-state">최근 활동이 없습니다</div>';
     return;
   }
 
