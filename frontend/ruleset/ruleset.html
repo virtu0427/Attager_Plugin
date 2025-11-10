@@ -3,60 +3,173 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>A2A Security Dashboard - Ruleset</title>
-
+    <title>A2A Security Dashboard - 룰셋</title>
+    <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="style.css" />
     <script src="ruleset.js" defer></script>
   </head>
   <body>
-    <div class="app-container">
+    <div class="app-container" data-page="ruleset">
       <header class="app-header">
         <div class="logo">A2A SECURE</div>
-
         <nav class="main-nav">
-          <a href="../dashboard.html" class="nav-link">Dashboard</a>
-          <a href="../agents/agents.html" class="nav-link">Agents</a>
-          <a href="../logs/logs.html" class="nav-link">Logs</a>
-          <a href="Ruleset.html" class="nav-link active">Ruleset</a>
+          <a href="../dashboard.html" class="nav-link">대시보드</a>
+          <a href="../agents/agents.html" class="nav-link">에이전트</a>
+          <a href="../logs/logs.html" class="nav-link">로그</a>
+          <a href="ruleset.html" class="nav-link active">룰셋</a>
         </nav>
       </header>
 
       <main class="content-area">
-        <section id="ruleset" class="content-page active">
-          <div class="widget widget-ruleset-list">
-            <div class="widget-header-with-button">
-              <h3 class="widget-title">Ruleset List</h3>
-              <div class="widget-actions">
-                <button class="btn-primary" id="openModalBtn">
-                  Add New Rule
-                </button>
+        <div class="content-wrapper">
+          <section id="ruleset" class="content-page active">
+            <article class="widget ruleset-widget">
+              <div class="widget-header-with-button">
+                <h3 class="widget-title">룰셋 카탈로그</h3>
+                <div class="widget-actions">
+                  <button class="btn-primary" id="open-create-ruleset">새 룰셋</button>
+                </div>
               </div>
-            </div>
 
-            <div class="table-container">
-              <table class="ruleset-table">
-                <thead>
-                  <tr>
-                    <th>Ruleset ID</th>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <!-- Rulesets will be loaded dynamically -->
-                  <tr>
-                    <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 20px;">
-                      Loading rulesets...
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+              <div class="table-container">
+                <table class="ruleset-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>이름</th>
+                      <th>유형</th>
+                      <th>상태</th>
+                      <th>업데이트</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="ruleset-table-body">
+                    <tr>
+                      <td colspan="6" class="empty-state">룰셋을 불러오는 중…</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </section>
+        </div>
       </main>
     </div>
+
+    <template id="ruleset-row-template">
+      <tr>
+        <td class="ruleset-id"></td>
+        <td class="ruleset-name"></td>
+        <td class="ruleset-type"></td>
+        <td class="ruleset-status"></td>
+        <td class="ruleset-updated"></td>
+        <td class="ruleset-actions">
+          <button class="btn-secondary btn-small" data-action="view">보기</button>
+          <button class="btn-secondary btn-small" data-action="edit">수정</button>
+          <button class="btn-danger btn-small" data-action="delete">삭제</button>
+        </td>
+      </tr>
+    </template>
+
+    <div class="modal-overlay hidden" id="ruleset-modal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ruleset-modal-title">
+        <div class="modal-header">
+          <h3 id="ruleset-modal-title">룰셋</h3>
+          <button class="btn-secondary" id="close-ruleset-modal">닫기</button>
+        </div>
+        <div class="modal-content" id="ruleset-modal-body"></div>
+      </div>
+    </div>
+
+    <template id="ruleset-form-template">
+      <form id="ruleset-form" class="ruleset-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="ruleset-id">룰셋 ID</label>
+            <input type="text" id="ruleset-id" name="ruleset_id" required placeholder="ruleset_example" />
+          </div>
+
+          <div class="form-group">
+            <label for="ruleset-name">표시 이름</label>
+            <input type="text" id="ruleset-name" name="name" required />
+          </div>
+
+          <div class="form-group">
+            <label for="ruleset-type">룰셋 유형</label>
+            <select id="ruleset-type" name="type" required>
+              <option value="prompt_validation">프롬프트 검증</option>
+              <option value="tool_validation">툴 검증</option>
+              <option value="response_filtering">응답 필터링</option>
+            </select>
+          </div>
+
+          <div class="form-group checkbox">
+            <label for="ruleset-enabled">
+              <input type="checkbox" id="ruleset-enabled" name="enabled" checked />
+              사용함
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="ruleset-description">설명</label>
+          <textarea id="ruleset-description" name="description" placeholder="룰셋 동작을 설명하세요"></textarea>
+        </div>
+
+        <div class="form-group" data-field="prompt_validation">
+          <label for="ruleset-system-prompt">시스템 프롬프트</label>
+          <textarea id="ruleset-system-prompt" name="system_prompt" placeholder="시스템 프롬프트"></textarea>
+        </div>
+
+        <div class="form-group" data-field="prompt_validation">
+          <label for="ruleset-model">모델 (선택)</label>
+          <input type="text" id="ruleset-model" name="model" placeholder="gemini-2.0-flash-exp" />
+        </div>
+
+        <div class="form-group" data-field="tool_validation">
+          <label for="ruleset-tool-name">툴 이름</label>
+          <input type="text" id="ruleset-tool-name" name="tool_name" placeholder="call_remote_agent" />
+        </div>
+
+        <div class="form-group" data-field="tool_validation">
+          <label for="ruleset-rules">검증 규칙 (JSON)</label>
+          <textarea id="ruleset-rules" name="rules" placeholder='{"allowed_agents": []}'></textarea>
+        </div>
+
+        <div class="form-group" data-field="response_filtering">
+          <label for="ruleset-blocked">차단 키워드 (JSON 배열)</label>
+          <textarea id="ruleset-blocked" name="blocked_keywords" placeholder='["secret", "credential"]'></textarea>
+        </div>
+
+        <div class="form-actions">
+          <span class="status-message" id="ruleset-form-status"></span>
+          <button type="submit" class="btn-primary">룰셋 저장</button>
+        </div>
+      </form>
+    </template>
+
+    <template id="ruleset-detail-template">
+      <div class="ruleset-detail">
+        <div class="detail-grid">
+          <div>
+            <h4>메타데이터</h4>
+            <ul>
+              <li><strong>룰셋 ID:</strong> <span data-field="ruleset_id"></span></li>
+              <li><strong>유형:</strong> <span data-field="type"></span></li>
+              <li><strong>상태:</strong> <span data-field="status"></span></li>
+              <li><strong>업데이트:</strong> <span data-field="updated"></span></li>
+            </ul>
+          </div>
+          <div>
+            <h4>설명</h4>
+            <p data-field="description"></p>
+          </div>
+        </div>
+        <div class="detail-json">
+          <h4>구성</h4>
+          <pre data-field="json"></pre>
+        </div>
+      </div>
+    </template>
   </body>
 </html>

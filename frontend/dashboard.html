@@ -3,746 +3,109 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>A2A Security Dashboard - Dashboard</title>
-
+    <title>A2A Security Dashboard - 대시보드</title>
     <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
     <script src="dashboard.js" defer></script>
-
-    <style>
-      /* ========================================
-         Agent Interaction Map 스타일
-         ======================================== */
-
-      /* :root 변수 (원본 파일 기준) 
-      - style.css에 이미 있다면 이 부분은 생략하거나 맞게 수정하세요. 
-      */
-      :root {
-        --bg: #0b0f14;
-        --fg: #e7ecf2;
-        --muted: #aab5c0;
-        --primary: #6dd3ff;
-        --kinic: #4ef6b2;
-        --edge: #66aaff;
-        --card-bg: rgba(255, 255, 255, 0.07);
-        --ring: rgba(255, 255, 255, 0.18);
-        --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-        --text-secondary: var(--muted); /* 대시보드 호환용 */
-      }
-
-      /* 위젯 컨테이너 설정 */
-      .widget-agent-graph {
-        position: relative; /* 자식 요소의 position:absolute 기준점 */
-        overflow: hidden; /* 위젯 밖으로 나가지 않도록 */
-        min-height: 500px;
-        z-index: 0;
-      }
-
-      /* SVG 그래프 영역 */
-      #graph {
-        position: absolute;
-        top: 60px; /* 카드 레이어와 동일하게 */
-        left: 0;
-        right: 0;
-        bottom: 0;
-        width: 100%;
-        height: calc(100% - 50px); /* 높이 조정 */
-        overflow: hidden; /* 선도 잘리도록 */
-        z-index: 1;
-      }
-
-      /* HTML 카드 레이어 */
-      #cardsLayer {
-        position: absolute;
-        top: 60px; /* 위젯 타이틀 아래부터 시작 */
-        left: 0;
-        right: 0;
-        bottom: 0;
-        overflow: hidden; /* 이 영역을 넘으면 잘림 */
-        z-index: 2;
-      }
-
-      /* 에이전트 카드 기본 스타일 */
-      .agent-card {
-        position: absolute;
-        width: 200px; /* 220px -> 200px */
-        pointer-events: auto; /* 카드 자체는 클릭/드래그 가능 */
-        background: var(--card-bg, rgba(255, 255, 255, 0.07));
-        border: 1px solid var(--ring, rgba(255, 255, 255, 0.18));
-        box-shadow: var(--shadow, 0 10px 30px rgba(0, 0, 0, 0.35));
-        backdrop-filter: blur(14px) saturate(120%);
-        border-radius: 14px; /* 16px -> 14px */
-        padding: 10px; /* 12px -> 10px */
-        color: var(--fg); /* 대시보드 텍스트 색상 상속 */
-      }
-
-      .agent-card:hover {
-        transform: translateY(
-          -2px
-        ); /* JS에서 translate()를 사용하므로 덮어쓸 수 있음 */
-      }
-
-      /* 카드 헤더 및 아바타 */
-      .agent-header {
-        display: flex;
-        align-items: center;
-        gap: 8px; /* 10px -> 8px */
-        margin-bottom: 6px; /* 8px -> 6px */
-      }
-      .agent-avatar {
-        width: 32px; /* 36px -> 32px */
-        height: 32px; /* 36px -> 32px */
-        border-radius: 10px; /* 12px -> 10px */
-        display: grid;
-        place-items: center;
-        background: radial-gradient(
-          circle at 30% 30%,
-          rgba(255, 255, 255, 0.35),
-          rgba(255, 255, 255, 0.1)
-        );
-        border: 1px solid rgba(255, 255, 255, 0.18);
-      }
-      .agent-avatar .dot {
-        width: 7px; /* 8px -> 7px */
-        height: 7px; /* 8px -> 7px */
-        border-radius: 50%;
-        background: var(--kinic, #4ef6b2);
-        box-shadow: 0 0 10px var(--kinic, #4ef6b2); /* 12px -> 10px */
-      }
-      .agent-title {
-        display: flex;
-        flex-direction: column;
-      }
-      .agent-title .name {
-        font-weight: 700;
-        letter-spacing: 0.3px;
-      }
-      .agent-title .role {
-        font-size: 11px; /* 12px -> 11px */
-        color: var(--text-secondary, var(--muted, #aab5c0));
-      }
-
-      /* 카드 지표 */
-      .agent-metrics {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 4px; /* 6px -> 4px */
-        margin-top: 6px; /* 8px -> 6px */
-      }
-      .metric {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        border-radius: 8px; /* 10px -> 8px */
-        padding: 6px; /* 8px -> 6px */
-      }
-      .metric .label {
-        font-size: 10px; /* 11px -> 10px */
-        color: var(--text-secondary, var(--muted, #aab5c0));
-      }
-      .metric .value {
-        font-size: 13px; /* 14px -> 13px */
-        font-weight: 700;
-      }
-
-      /* 에이전트 유형별 색상 */
-      /* Kinic */
-      .agent-card.kinic {
-        background: linear-gradient(
-          135deg,
-          rgba(78, 246, 178, 0.15),
-          rgba(109, 211, 255, 0.1)
-        );
-        border: 1px solid rgba(78, 246, 178, 0.65);
-      }
-      .agent-card.kinic .agent-avatar {
-        background: linear-gradient(135deg, #4ef6b2, #6dd3ff);
-      }
-      .agent-card.kinic .agent-avatar .dot {
-        background: white;
-      }
-      .agent-card.kinic .metric {
-        background: rgba(78, 246, 178, 0.08);
-        border: 1px solid rgba(78, 246, 178, 0.25);
-      }
-      .agent-card.kinic .metric .value {
-        color: #4ef6b2;
-      }
-
-      /* Planner */
-      .agent-card.planner .agent-avatar {
-        background: linear-gradient(135deg, #6dd3ff, #a48fff);
-      }
-      .agent-card.planner .agent-avatar .dot {
-        background: #6dd3ff;
-      }
-
-      /* Researcher */
-      .agent-card.researcher .agent-avatar {
-        background: linear-gradient(135deg, #a48fff, #ff8fa4);
-      }
-      .agent-card.researcher .agent-avatar .dot {
-        background: #a48fff;
-      }
-
-      /* Reviewer */
-      .agent-card.reviewer .agent-avatar {
-        background: linear-gradient(135deg, #ffb86c, #ff8fa4);
-      }
-      .agent-card.reviewer .agent-avatar .dot {
-        background: #ffb86c;
-      }
-
-      /* Toolsmith */
-      .agent-card.toolsmith .agent-avatar {
-        background: linear-gradient(135deg, #8fa4ff, #b28fff);
-      }
-      .agent-card.toolsmith .agent-avatar .dot {
-        background: #8fa4ff;
-      }
-
-      /* Concierge */
-      .agent-card.concierge .agent-avatar {
-        background: linear-gradient(135deg, #ffd36d, #ffa46d);
-      }
-      .agent-card.concierge .agent-avatar .dot {
-        background: #ffd36d;
-      }
-
-      /* SVG 엣지(선) 스타일 */
-      .edge {
-        stroke: var(--edge, #66aaff);
-        stroke-opacity: 0.66;
-        stroke-width: 2px;
-        fill: none;
-        marker-end: url(#arrow);
-      }
-      .edge-label {
-        font-size: 11px; /* 12px -> 11px */
-        fill: var(--text-secondary, var(--muted, #aab5c0));
-        user-select: none;
-        transform: translateY(-6px);
-      }
-      .edge-arrow {
-        fill: var(--edge, #66aaff);
-        opacity: 0.9;
-      }
-      .pulse {
-        fill: white;
-        opacity: 0.9;
-        filter: drop-shadow(0 0 8px white);
-      }
-    </style>
   </head>
   <body>
-    <div class="app-container">
+    <div class="app-container" data-page="dashboard">
       <header class="app-header">
         <div class="logo">A2A SECURE</div>
-
         <nav class="main-nav">
-          <a href="dashboard.html" class="nav-link active">Dashboard</a>
-          <a href="agents/agents.html" class="nav-link">Agents</a>
-          <a href="logs/logs.html" class="nav-link">Logs</a>
-          <a href="ruleset/ruleset.html" class="nav-link">Ruleset</a>
+          <a href="dashboard.html" class="nav-link active">대시보드</a>
+          <a href="agents/agents.html" class="nav-link">에이전트</a>
+          <a href="logs/logs.html" class="nav-link">로그</a>
+          <a href="ruleset/ruleset.html" class="nav-link">룰셋</a>
         </nav>
       </header>
 
       <main class="content-area">
-        <section id="dashboard" class="content-page active">
-          <div class="widget widget-agent-graph">
-            <h3 class="widget-title">Agent Interaction Map</h3>
+        <div class="content-wrapper">
+          <section id="dashboard" class="content-page active">
+            <div class="dashboard-grid">
+              <article class="widget widget-agent-graph">
+                <div class="widget-header-with-button">
+                  <h3 class="widget-title">에이전트 흐름 그래프</h3>
+                  <div class="widget-actions">
+                    <span class="pill pill-live" id="flow-status">동기화 중…</span>
+                    <button class="btn-secondary" id="refresh-flow">새로고침</button>
+                  </div>
+                </div>
+                <div class="graph-container">
+                  <div id="graph-tooltip" class="graph-tooltip hidden"></div>
+                  <svg id="agent-flow-graph" role="presentation"></svg>
+                </div>
+              </article>
 
-            <svg id="graph" aria-hidden="true">
-              <defs>
-                <marker
-                  id="arrow"
-                  viewBox="0 0 10 10"
-                  refX="10"
-                  refY="5"
-                  markerUnits="strokeWidth"
-                  markerWidth="8"
-                  markerHeight="6"
-                  orient="auto"
-                >
-                  <path d="M 0 0 L 10 5 L 0 10 z" class="edge-arrow"></path>
-                </marker>
-              </defs>
-              <g id="zoomRoot">
-                <g id="edgesLayer"></g>
-                <g id="pulsesLayer"></g>
-              </g>
-            </svg>
-            <div id="cardsLayer" aria-live="polite"></div>
-          </div>
-          <div class="widget widget-traffic-stats">
-            <h3 class="widget-title">트래픽 통계</h3>
-            <div style="color: var(--text-secondary)">
-              [ 트래픽 바 차트 표시 영역 ]
+              <article class="widget widget-stats">
+                <div class="widget-header-with-button">
+                  <h3 class="widget-title">운영 개요</h3>
+                  <div class="widget-actions">
+                    <button class="btn-secondary" id="refresh-dashboard">새로고침</button>
+                  </div>
+                </div>
+                <div class="stat-grid">
+                  <div class="stat-card">
+                    <span class="label">총 에이전트</span>
+                    <span class="value" id="total-agents">0</span>
+                  </div>
+                  <div class="stat-card">
+                    <span class="label">총 룰셋</span>
+                    <span class="value" id="total-rulesets">0</span>
+                  </div>
+                  <div class="stat-card">
+                    <span class="label">정책 위반 (24시간)</span>
+                    <span class="value" id="total-violations">0</span>
+                  </div>
+                  <div class="stat-card">
+                    <span class="label">수집된 이벤트</span>
+                    <span class="value" id="total-events">0</span>
+                  </div>
+                </div>
+                <div class="risk-indicator" id="risk-indicator">
+                  <div class="risk-label">위험 지수</div>
+                  <div class="risk-value" id="risk-score">--</div>
+                  <div class="risk-bar">
+                    <div class="risk-bar-fill" id="risk-bar-fill"></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="widget widget-traffic-stats">
+                <div class="widget-header-with-button">
+                  <h3 class="widget-title">이벤트 활동</h3>
+                  <div class="widget-actions">
+                    <span class="pill" id="chart-range">최근 60분</span>
+                  </div>
+                </div>
+                <canvas id="events-chart" height="220"></canvas>
+              </article>
+
+              <article class="widget widget-agent-status">
+                <div class="widget-header-with-button">
+                  <h3 class="widget-title">에이전트 상태</h3>
+                  <div class="widget-actions">
+                    <a class="btn-secondary" href="agents/agents.html">에이전트 관리</a>
+                  </div>
+                </div>
+                <ul class="agent-status-list" id="agent-status-list"></ul>
+              </article>
+
+              <article class="widget widget-recent-logs">
+                <div class="widget-header-with-button">
+                  <h3 class="widget-title">최근 정책 로그</h3>
+                  <div class="widget-actions">
+                    <a class="btn-primary" href="logs/logs.html">로그 탐색기 열기</a>
+                  </div>
+                </div>
+                <div class="log-list" id="dashboard-log-list"></div>
+              </article>
             </div>
-          </div>
-          <div class="widget widget-threat-feed">
-            <h3 class="widget-title">실시간 위협 탐지 현황</h3>
-            <ul class="threat-list">
-              <li class="threat-item critical">
-                Agent 'Orchestrator' Task Replay Attack (20:25)
-              </li>
-              <li class="threat-item warning">
-                Agent 'Bridge' Unusual Data Access (20:23)
-              </li>
-              <li class="threat-item critical">
-                Agent 'Agent2' Card Spoofing (20:21)
-              </li>
-            </ul>
-          </div>
-          <div class="widget widget-risk-score">
-            <h3 class="widget-title">Risk Assessment Score</h3>
-            <div class="risk-score-display">8.7/10</div>
-          </div>
-        </section>
+          </section>
+        </div>
       </main>
     </div>
-    <script>
-      document.addEventListener("DOMContentLoaded", () => {
-        // 1. 필수 DOM 요소 선택
-        const svg = document.querySelector("#graph");
-        const zoomRoot = document.querySelector("#zoomRoot"); // SVG 그룹
-        const edgesLayer = document.querySelector("#edgesLayer");
-        const pulsesLayer = document.querySelector("#pulsesLayer");
-        const cardsLayer = document.querySelector("#cardsLayer");
-        const widget = document.querySelector(".widget-agent-graph");
-
-        // 2. 그래프 데이터 및 상태
-        let running = true; // 애니메이션 실행 상태
-        const graph = {
-          nodes: [
-            // 물리 엔진을 위해 vx(x속도), vy(y속도), fx(고정x), fy(고정y) 추가
-            {
-              id: "kinic",
-              name: "Orchestrator",
-              role: "Orchestrator Agent",
-              kind: "kinic",
-              vx: 0,
-              vy: 0,
-              fx: null,
-              fy: null,
-            },
-            {
-              id: "planner",
-              name: "Agent1",
-              role: "Orchestrator Agent",
-              kind: "planner",
-              vx: 0,
-              vy: 0,
-              fx: null,
-              fy: null,
-            },
-            {
-              id: "researcher",
-              name: "Agent2",
-              role: "Web + RAG",
-              kind: "researcher",
-              vx: 0,
-              vy: 0,
-              fx: null,
-              fy: null,
-            },
-            {
-              id: "reviewer",
-              name: "Agent3",
-              role: "Critic",
-              kind: "reviewer",
-              vx: 0,
-              vy: 0,
-              fx: null,
-              fy: null,
-            },
-            {
-              id: "toolsmith",
-              name: "Agent4",
-              role: "MCP Tools",
-              kind: "toolsmith",
-              vx: 0,
-              vy: 0,
-              fx: null,
-              fy: null,
-            },
-            {
-              id: "concierge",
-              name: "Bridge",
-              role: "A2A Client",
-              kind: "concierge",
-              vx: 0,
-              vy: 0,
-              fx: null,
-              fy: null,
-            },
-          ],
-          links: [
-            // Kinic to All
-            { source: "kinic", target: "planner" },
-            { source: "kinic", target: "researcher" },
-            { source: "kinic", target: "reviewer" },
-            { source: "kinic", target: "toolsmith" },
-            { source: "kinic", target: "concierge" },
-
-            // Planner to All (Kinic 제외)
-            { source: "planner", target: "researcher" },
-            { source: "planner", target: "reviewer" },
-            { source: "planner", target: "toolsmith" },
-            { source: "planner", target: "concierge" },
-
-            // Researcher to All (Kinic, Planner 제외)
-            { source: "researcher", target: "reviewer" },
-            { source: "researcher", target: "toolsmith" },
-            { source: "researcher", target: "concierge" },
-
-            // Reviewer to All
-            { source: "reviewer", target: "toolsmith" },
-            { source: "reviewer", target: "concierge" },
-
-            // Toolsmith to All
-            { source: "toolsmith", target: "concierge" },
-          ],
-        };
-
-        // 3. 물리 엔진 (원본 파일의 'physics' 객체)
-        const physics = {
-          linkDist(l) {
-            // Kinic(중앙)과의 거리를 더 가깝게
-            return l.source === "kinic" || l.target === "kinic" ? 380 : 420; // 450/500 -> 380/420
-          },
-          step(dt) {
-            const nodes = graph.nodes,
-              links = graph.links;
-            const kLink = 0.0018,
-              kCharge = 7000, // 8000 -> 7000 (반발력 감소)
-              kCenter = 0.01,
-              damp = 0.9,
-              radius = 230; // 260 -> 230 (충돌 반경 감소)
-
-            // 링크(스프링) 장력 계산
-            for (const l of links) {
-              const a = graph.nodes.find((n) => n.id === l.source);
-              const b = graph.nodes.find((n) => n.id === l.target);
-              if (!a || !b) continue;
-
-              let dx = b.x - a.x,
-                dy = b.y - a.y,
-                dist = Math.hypot(dx, dy) || 0.001;
-              const d0 = this.linkDist(l),
-                f = kLink * (dist - d0);
-              dx /= dist;
-              dy /= dist;
-              const fx = f * dx,
-                fy = f * dy;
-              a.vx += fx;
-              a.vy += fy;
-              b.vx -= fx;
-              b.vy -= fy;
-            }
-
-            // 노드 간 척력(반발력) 계산
-            for (let i = 0; i < nodes.length; i++) {
-              for (let j = i + 1; j < nodes.length; j++) {
-                const a = nodes[i],
-                  b = nodes[j];
-                let dx = b.x - a.x,
-                  dy = b.y - a.y,
-                  d2 = dx * dx + dy * dy + 0.01,
-                  d = Math.sqrt(d2);
-                const f = kCharge / d2,
-                  fx = (f * dx) / d,
-                  fy = (f * dy) / d;
-                a.vx -= fx;
-                a.vy -= fy;
-                b.vx += fx;
-                b.vy += fy;
-                if (d < radius) {
-                  // 충돌 방지
-                  const push = (radius - d) * 0.02,
-                    px = (push * dx) / d,
-                    py = (push * dy) / d;
-                  a.vx -= px;
-                  a.vy -= py;
-                  b.vx += px;
-                  b.vy += py;
-                }
-              }
-            }
-
-            // 중앙으로 당기는 힘 + 속도 적용
-            const rect = widget.getBoundingClientRect();
-            const cx = (rect.width || 300) / 2; // 위젯 중앙
-            const cy = (rect.height || 300) / 2;
-
-            for (const p of nodes) {
-              if (p.fx != null && p.fy != null) {
-                // 드래그 중(fx, fy가 고정됨)
-                p.vx += (p.fx - p.x) * 0.06;
-                p.vy += (p.fy - p.y) * 0.06;
-              } else {
-                // 자유 상태 (중앙으로 당기기)
-                p.vx += (cx - p.x) * kCenter;
-                p.vy += (cy - p.y) * kCenter;
-              }
-              p.vx *= damp; // 속도 감쇠
-              p.vy *= damp;
-              p.x += p.vx * dt; // 위치 업데이트
-              p.y += p.vy * dt;
-            }
-          },
-        };
-
-        // 4. 렌더링 및 이벤트 핸들러
-
-        /**
-         * 매 프레임마다 DOM을 업데이트합니다.
-         */
-        function draw() {
-          // A. 노드(카드) 위치 업데이트
-          graph.nodes.forEach((n) => {
-            const card = cardsLayer.querySelector(
-              `.agent-card[data-id="${n.id}"]`
-            );
-            if (card) {
-              const x = n.x - 100; // 110 -> 100 (카드 너비 200px의 절반)
-              const y = n.y - 50; // 60 -> 50 (줄어든 카드 높이의 절반)
-              // 둥둥 떠다니는 느낌을 위해 will-change 대신 직접 transform 설정
-              card.style.transform = `translate(${x}px, ${y}px)`;
-            }
-          });
-
-          // B. 엣지(선) 위치 업데이트
-          graph.links.forEach((l) => {
-            const a = graph.nodes.find((n) => n.id === l.source);
-            const b = graph.nodes.find((n) => n.id === l.target);
-            if (!a || !b) return;
-
-            const id = `${l.source}->${l.target}`; // ID를 직접 생성합니다
-            const path = edgesLayer.querySelector(
-              `path[data-edge-id="${id}"]` // 생성된 ID로 찾습니다
-            );
-            if (path) path.setAttribute("d", `M${a.x},${a.y} L${b.x},${b.y}`);
-
-            const label = edgesLayer.querySelector(
-              `text[data-edge-label-id="lbl-${id}"]`
-            );
-            if (label) {
-              label.setAttribute("x", (a.x + b.x) / 2);
-              label.setAttribute("y", (a.y + b.y) / 2);
-            }
-          });
-
-          // SVG 줌/팬 (현재는 1:1)
-          zoomRoot.setAttribute("transform", "translate(0,0) scale(1)");
-        }
-
-        /**
-         * 펄스(점) 애니메이션을 생성합니다.
-         */
-        function pulse(srcId, tgtId, kind = "msg", lat = 160) {
-          const l = graph.links.find(
-            (l) => l.source === srcId && l.target === tgtId
-          );
-          if (!l) return;
-
-          // *수정*: 링크 ID가 데이터에 없으므로 직접 생성해서 path를 찾아야 합니다.
-          const edgeId = `${l.source}->${l.target}`;
-          const p = edgesLayer.querySelector(`path[data-edge-id="${edgeId}"]`);
-
-          if (!p || p.getTotalLength() === 0) return; // 선이 그려지지 않았으면 중단
-
-          const total = p.getTotalLength();
-          const dot = document.createElementNS(
-            "http://www.w3.org/2000/svg",
-            "circle"
-          );
-          dot.setAttribute("class", "pulse");
-          dot.setAttribute("r", "4");
-
-          const color =
-            kind === "task"
-              ? "#a48fff"
-              : kind === "artifact"
-              ? "#4ef6b2"
-              : "#6dd3ff";
-          dot.style.fill = color;
-          dot.style.filter = `drop-shadow(0 0 10px ${color})`;
-          pulsesLayer.appendChild(dot);
-
-          const start = performance.now();
-          function step(now) {
-            const t = Math.min(1, (now - start) / Math.max(80, lat * 2));
-            const pt = p.getPointAtLength(t * total);
-            dot.setAttribute("cx", pt.x);
-            dot.setAttribute("cy", pt.y);
-
-            if (t < 1 && running) {
-              // 'running' 상태 체크
-              requestAnimationFrame(step);
-            } else {
-              dot.remove();
-            }
-          }
-          requestAnimationFrame(step);
-        }
-
-        /**
-         * 데모 A2A 이벤트를 처리합니다.
-         */
-        function onA2A(evt) {
-          const {
-            type = "msg",
-            source,
-            target,
-            latencyMs = Math.random() * 200 + 40,
-          } = evt;
-          if (!source || !target) return;
-          pulse(source, target, type, latencyMs);
-        }
-
-        /**
-         * HTML 카드를 DOM에 마운트하고 물리 드래그 이벤트를 바인딩합니다.
-         */
-        function mountCard(n) {
-          const card = document.createElement("div");
-          card.className = `agent-card ${n.kind}`;
-          card.setAttribute("data-id", n.id);
-          card.innerHTML = `
-            <div class="agent-header">
-              <div class="agent-avatar"><span class="dot"></span></div>
-              <div class="agent-title">
-                <span class="name">${n.name}</span>
-                <span class="role">${n.role}</span>
-              </div>
-            </div>
-            <div class="agent-metrics">
-              <div class="metric"><span class="label">RPS</span><span class="value">0.0</span></div>
-              <div class="metric"><span class="label">p95</span><span class="value">0 ms</span></div>
-              <div class="metric"><span class="label">RAG</span><span class="value">0</span></div>
-            </div>
-          `;
-          cardsLayer.appendChild(card);
-
-          // 물리 엔진 드래그 핸들러
-          card.addEventListener("pointerdown", (e) => {
-            e.preventDefault();
-            card.setPointerCapture(e.pointerId);
-            n._dragging = true;
-            // 물리 엔진에 '고정' 신호
-            n.fx = n.x;
-            n.fy = n.y;
-          });
-
-          card.addEventListener("pointermove", (e) => {
-            if (!n._dragging) return;
-            // 마우스 이동량(e.movementX/Y)을 '고정' 위치에 반영
-            // (줌/팬이 없으므로 간단히 movementX/Y 사용)
-            if (n.fx != null && n.fy != null) {
-              n.fx += e.movementX;
-              n.fy += e.movementY;
-            }
-          });
-
-          card.addEventListener("pointerup", (e) => {
-            if (!n._dragging) return;
-            n._dragging = false;
-            card.releasePointerCapture(e.pointerId);
-            // '고정' 해제 -> 물리 엔진이 다시 제어권 가짐
-            n.fx = null;
-            n.fy = null;
-          });
-        }
-
-        /**
-         * SVG 엣지를 DOM에 마운트합니다.
-         */
-        function mountEdge(l) {
-          const id = `${l.source}->${l.target}`;
-          const path = document.createElementNS(
-            "http://www.w3.org/2000/svg",
-            "path"
-          );
-          path.setAttribute("class", "edge");
-          path.setAttribute("data-edge-id", id);
-          path.setAttribute("marker-end", "url(#arrow)");
-          edgesLayer.appendChild(path);
-
-          const label = document.createElementNS(
-            "http://www.w3.org/2000/svg",
-            "text"
-          );
-          label.setAttribute("class", "edge-label");
-          label.setAttribute("data-edge-label-id", `lbl-${id}`);
-          label.textContent = "A2A";
-          edgesLayer.appendChild(label);
-        }
-
-        // 5. 메인 루프 (Main Loop)
-        let last = performance.now();
-        function loop() {
-          const now = performance.now();
-          // 프레임 간 시간차(dt)를 계산하여 물리 엔진에 전달
-          const dt = Math.min(1 / 30, (now - last) / 16.67);
-          last = now;
-
-          if (running) {
-            physics.step(dt); // 물리 계산
-          }
-          draw(); // 그리기 (일시정지 중에도 마지막 위치는 그려야 함)
-
-          requestAnimationFrame(loop); // 다음 프레임 요청
-        }
-
-        // 6. 초기화 실행
-
-        // A. 초기 링 레이아웃 계산
-        const rect = widget.getBoundingClientRect();
-        const widgetWidth = rect.width || 300;
-        const widgetHeight = rect.height || 300;
-        const R = Math.min(widgetWidth, widgetHeight) / 3.5;
-        const cx = widgetWidth / 2;
-        const cy = widgetHeight / 2;
-
-        const others = graph.nodes.filter((n) => n.id !== "kinic");
-        others.forEach((n, i) => {
-          const ang = (i / others.length) * Math.PI * 2;
-          n.x = cx + Math.cos(ang) * R;
-          n.y = cy + Math.sin(ang) * R;
-        });
-        const kinic = graph.nodes.find((n) => n.id === "kinic");
-        kinic.x = cx;
-        kinic.y = cy;
-
-        // B. DOM에 노드 및 엣지 마운트
-        graph.nodes.forEach(mountCard);
-        graph.links.forEach(mountEdge);
-
-        // C. 데모 펄스 시작
-        setInterval(() => {
-          if (!running) return; // 일시정지 시 중단
-
-          const ids = graph.nodes.map((n) => n.id);
-          const s = ids[Math.floor(Math.random() * ids.length)];
-          let t = ids[Math.floor(Math.random() * ids.length)];
-          if (t === s) t = "kinic";
-
-          if (graph.links.some((l) => l.source === s && l.target === t)) {
-            const types = ["msg", "task", "artifact"];
-            const k = types[Math.floor(Math.random() * types.length)];
-            onA2A({
-              type: k,
-              source: s,
-              target: t,
-              latencyMs: Math.random() * 300 + 50,
-            });
-          }
-        }, 1000); // 1초마다
-
-        // D. 메인 루프 시작! (draw() 대신 loop() 호출)
-        loop();
-      });
-    </script>
   </body>
 </html>

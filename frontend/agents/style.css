@@ -1,203 +1,247 @@
-/* === CSS 변수 (테마) === */
-:root {
-  --bg-dark-primary: #1a1a2e; /* 매우 어두운 네이비 (메인 배경) */
-  --bg-dark-secondary: #1e1e3f; /* 살짝 밝은 네이비 (카드 배경) */
-  --border-color: #3a3a5f; /* 테두리 색상 */
-  --text-primary: #f0f0f5; /* 기본 텍스트 */
-  --text-secondary: #aab; /* 보조 텍스트 */
-  --accent-primary: #00aaff; /* 포인트 색상 (블루) */
-  --accent-hover: #0088cc; /* 포인트 호버 */
-  --critical-red: #ff4d4d; /* 위협 (Critical) */
-  --warning-yellow: #ffaa00; /* 위협 (Warning) */
-  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
+.agents-layout {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
 }
 
-/* === 기본 스타일 === */
-* {
-  box-sizing: border-box;
+@media (min-width: 1100px) {
+  .agents-layout {
+    grid-template-columns: 320px minmax(0, 1fr);
+  }
+}
+
+.agent-sidebar {
+  padding: 0;
+  overflow: hidden;
+}
+
+.agent-sidebar .widget-header-with-button {
+  padding: 1.5rem 1.5rem 1rem;
+  margin-bottom: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.agent-sidebar .widget-actions input {
+  width: 100%;
+}
+
+.agent-list {
+  list-style: none;
   margin: 0;
   padding: 0;
+  max-height: clamp(280px, 70vh, 640px);
+  overflow-y: auto;
 }
 
-html,
-body {
-  height: 100%;
-  font-family: var(--font-family);
-  background-color: var(--bg-dark-primary);
-  color: var(--text-primary);
-  font-size: 16px;
-}
-
-/* === 메인 레이아웃 === */
-.app-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.app-header {
-  display: flex;
-  align-items: center;
-  padding: 0 2rem;
-  height: 60px;
-  background-color: var(--bg-dark-secondary);
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
-}
-
-.logo {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: var(--accent-primary);
-  margin-right: 2rem;
-}
-
-/* === 네비게이션 (탭) === */
-.main-nav {
-  display: flex;
-  height: 100%;
-}
-
-.nav-link {
-  display: flex;
-  align-items: center;
-  padding: 0 1.5rem;
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  text-decoration: none;
-  border-bottom: 3px solid transparent;
-  transition: color 0.2s, border-bottom-color 0.2s;
-  cursor: pointer;
-}
-
-.nav-link:hover {
-  color: var(--text-primary);
-}
-
-.nav-link.active {
-  color: var(--accent-primary);
-  border-bottom-color: var(--accent-primary);
-}
-
-/* === 메인 컨텐츠 영역 === */
-.content-area {
-  flex-grow: 1;
-  padding: 2rem;
-  overflow-y: auto; /* 컨텐츠가 많아지면 스크롤 */
-}
-
-.content-page {
-  display: none;
-}
-
-.content-page.active {
-  display: block;
-}
-
-/* === 위젯 기본 스타일 === */
-.widget {
-  background-color: var(--bg-dark-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
-  margin-bottom: 2rem; /* Grid 사용 시 gap으로 대체) */
-}
-
-/* Grid 레이아웃 내의 위젯은 margin-bottom 제거 */
-.content-page.active[id="agents"] {
-  margin-bottom: 0;
-}
-.content-page.active[id="agents"] .widget {
-  margin-bottom: 0;
-}
-
-.widget:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 24px rgba(0, 170, 255, 0.1);
-}
-
-.widget-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-/* === 위젯 내부 (레지스트리 로그용) === */
-.threat-list {
-  list-style: none;
-}
-.threat-item {
-  padding: 0.75rem 0.5rem;
-  border-bottom: 1px dashed var(--border-color);
-}
-.threat-item:last-child {
-  border-bottom: none;
-}
-
-/* === 2. 에이전트 페이지 (CSS Grid) === */
-#agents.active {
-  display: grid;
-  grid-template-columns: 2fr 3fr; /* 3:1 비율 */
-  gap: 2rem;
-}
-
-.widget-agent-list {
-  grid-column: 1 / 2; /* 좌측 상단 */
-  grid-row: 1 / 2;
-}
-
-.widget-registry-log {
-  grid-column: 2 / 3; /* 우측 */
-  grid-row: 1 / 3; /* 우측 열 2칸 차지 */
-}
-
-.widget-agent-details {
-  grid-column: 1 / 2; /* 좌측 하단 */
-  grid-row: 2 / 3;
-}
-
-/* 에이전트 리스트 (List View) */
-.agent-list-container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.agent-list-item {
+.agent-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  border: 1px solid var(--border-color);
-  border-radius: 5px;
-  background-color: var(--bg-dark-primary);
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background 0.2s ease;
 }
 
-.agent-list-item:hover {
-  background-color: #2a2a4f;
+.agent-item:last-child {
+  border-bottom: none;
 }
 
-.agent-list-item strong {
-  font-size: 1.1rem;
-  color: var(--text-primary);
+.agent-item:hover,
+.agent-item.active {
+  background: rgba(101, 209, 255, 0.12);
 }
 
-/* 상태 표시 (Active) */
-.status-active {
-  font-size: 0.9em;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-weight: 500;
-  color: #4dff4d; /* 밝은 녹색 */
-  background-color: rgba(77, 255, 77, 0.1);
-  border: 1px solid rgba(77, 255, 77, 0.3);
+.agent-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.agent-name {
+  font-weight: 600;
+}
+
+.agent-description {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.agent-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.agent-details-placeholder {
+  display: grid;
+  place-content: center;
+  gap: 0.75rem;
+  min-height: 360px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.agent-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.overview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.overview-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-end;
+  min-width: 160px;
+}
+
+.plugins-panel {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.plugin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.plugin-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(101, 209, 255, 0.06);
+}
+
+.plugin-item strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.policy-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.policy-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-secondary);
+}
+
+.policy-columns {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 800px) {
+  .policy-columns {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.policy-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 14, 28, 0.4);
+}
+
+.policy-description {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.ruleset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ruleset-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+
+.ruleset-item input[type="checkbox"] {
+  margin-top: 0.2rem;
+  width: auto;
+}
+
+.ruleset-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ruleset-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.ruleset-description {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.policy-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .overview-meta {
+    align-items: flex-start;
+  }
+
+  .policy-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
 }
