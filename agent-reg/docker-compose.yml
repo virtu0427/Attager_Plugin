@@ -1,0 +1,23 @@
+services:
+  agent-registry:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_PATH: /app/agent_reg.db
+    volumes:
+      - agent_reg_data:/app
+    restart: unless-stopped
+
+  agent-registry-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"   
+    restart: unless-stopped
+
+volumes:
+  agent_reg_data:

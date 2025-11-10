@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A2A Security Dashboard - Ruleset</title>
+
+    <link rel="stylesheet" href="style.css" />
+    <script src="ruleset.js" defer></script>
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <div class="logo">A2A SECURE</div>
+
+        <nav class="main-nav">
+          <a href="../dashboard.html" class="nav-link">Dashboard</a>
+          <a href="../agents/agents.html" class="nav-link">Agents</a>
+          <a href="../logs/logs.html" class="nav-link">Logs</a>
+          <a href="Ruleset.html" class="nav-link active">Ruleset</a>
+        </nav>
+      </header>
+
+      <main class="content-area">
+        <section id="ruleset" class="content-page active">
+          <div class="widget widget-ruleset-list">
+            <div class="widget-header-with-button">
+              <h3 class="widget-title">Ruleset List</h3>
+              <div class="widget-actions">
+                <button class="btn-primary" id="openModalBtn">
+                  Add New Rule
+                </button>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="ruleset-table">
+                <thead>
+                  <tr>
+                    <th>Ruleset ID</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Rulesets will be loaded dynamically -->
+                  <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                      Loading rulesets...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

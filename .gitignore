@@ -1,0 +1,92 @@
+# -------------------------
+# Python
+# -------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.egg-info/
+*.log
+
+# -------------------------
+# Virtual environments
+# -------------------------
+.venv/
+venv/
+env/
+
+# -------------------------
+# Jupyter
+# -------------------------
+.ipynb_checkpoints/
+
+# -------------------------
+# IDE / Editor
+# -------------------------
+.vscode/
+.idea/
+*.swp
+
+# -------------------------
+# OS
+# -------------------------
+.DS_Store
+Thumbs.db
+
+# -------------------------
+# Redis / DB
+# -------------------------
+agentDB/redis-data/
+*.db
+*.sqlite
+
+# -------------------------
+# Docker
+# -------------------------
+*.pid
+*.seed
+*.bak
+*.tmp
+docker-compose.override.yml
+
+# -------------------------
+# Env & Secrets
+# -------------------------
+.env
+*.key
+*.pem
+
+# -------------------------
+# Node.js (Frontend)
+# -------------------------
+node_modules/
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+frontend/.next/
+frontend/.turbo/
+
+# -------------------------
+# Cache & Test
+# -------------------------
+.cache/
+__cache__/
+*.pytest_cache/
+coverage/
+htmlcov/
+
+# -------------------------
+# Agent Registry
+# -------------------------
+agent-reg/agent_reg.db
+agent_reg_data/
+
+# -------------------------
+# Logs
+# -------------------------
+logs/
+*.log
+nohup.out
+agentDB/redis-data/
+agentDB/redis-data/

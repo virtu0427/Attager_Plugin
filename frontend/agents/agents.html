@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A2A Security Dashboard - Agents</title>
+
+    <link rel="stylesheet" href="style.css" />
+    <script src="agents.js" defer></script>
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <div class="logo">A2A SECURE</div>
+
+        <nav class="main-nav">
+          <a href="../dashboard.html" class="nav-link">Dashboard</a>
+          <a href="agents.html" class="nav-link active">Agents</a>
+          <a href="../logs/logs.html" class="nav-link">Logs</a>
+          <a href="../ruleset/ruleset.html" class="nav-link">Ruleset</a>
+        </nav>
+      </header>
+
+      <main class="content-area">
+        <section id="agents" class="content-page active">
+          <div class="widget widget-agent-list">
+            <h3 class="widget-title">에이전트 리스트 (List)</h3>
+            <div class="agent-list-container">
+              <!-- Agents will be loaded dynamically by agents.js -->
+              <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                Loading agents...
+              </div>
+            </div>
+          </div>
+
+          <div class="widget widget-registry-log">
+            <h3 class="widget-title">레지스트리 로그 (추가/삭제)</h3>
+            <ul class="threat-list">
+              <li class="threat-item">
+                Agent 'Orchestrator' added @ Admin (14:30)
+              </li>
+              <li class="threat-item">Agent 'Agent2' added @ Admin (14:31)</li>
+            </ul>
+          </div>
+
+          <div class="widget widget-agent-details">
+            <h3 class="widget-title">선택된 에이전트 세부 정보</h3>
+            <div style="color: var(--text-secondary)">
+              [ 에이전트 리스트 아이템 클릭 시 상세 정보 표시 영역 ]
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

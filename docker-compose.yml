@@ -1,0 +1,201 @@
+services:
+  # Agent Registry
+  agent-registry:
+    build:
+      context: ./agent-reg
+      dockerfile: Dockerfile
+    container_name: agent-registry
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_PATH=/app/agent_reg.db
+    volumes:
+      - agent_reg_data:/app
+    networks:
+      - agent-network
+    restart: unless-stopped
+
+
+  # Agent Registry Frontend
+  agent-registry-frontend:
+    build:
+      context: ./agent-reg/frontend
+      dockerfile: Dockerfile
+    container_name: attager-agent-registry-frontend
+    ports:
+      - "3000:3000"
+    networks:
+      - agent-network
+    restart: unless-stopped
+    depends_on:
+      - agent-registry
+
+  # Redis for Agents (기존 에이전트용 Redis)
+  redis-agents:
+    image: redis:7-alpine
+    container_name: attager-redis-agents
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-agents-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for IAM Solution (IAM 솔루션 전용 Redis)
+  redis-iam:
+    image: redis:7-alpine
+    container_name: attager-redis-iam
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-iam-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - agent-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # IAM Policy Server (can be replaced by frontend app)
+  policy-server:
+    build:
+      context: .
+      dockerfile: ./Orchestrator_plugin/Dockerfile
+    container_name: attager-policy-server
+    ports:
+      - "8005:8005"
+    environment:
+      - REDIS_HOST=redis-iam
+      - REDIS_PORT=6379
+      - PORT=8005
+    depends_on:
+      redis-iam:
+        condition: service_healthy
+    networks:
+      - agent-network
+    command: python server_redis.py
+
+  # Frontend IAM Management UI
+  frontend:
+    build:
+      context: .
+      dockerfile: ./frontend/Dockerfile
+    container_name: attager-frontend
+    ports:
+      - "8006:8006"
+    environment:
+      - REDIS_HOST=redis-iam
+      - REDIS_PORT=6379
+      - PORT=8006
+    depends_on:
+      redis-iam:
+        condition: service_healthy
+    networks:
+      - agent-network
+    volumes:
+      - ./frontend:/app
+
+  # Delivery Agent
+  delivery-agent:
+    build:
+      context: .
+      dockerfile: ./agents/delivery_agent/Dockerfile
+    container_name: delivery-agent
+    ports:
+      - "10001:10001"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - REDIS_HOST=redis-agents
+      - REDIS_PORT=6379
+      - POLICY_SERVER_URL=http://policy-server:8005
+      - LOG_SERVER_URL=http://policy-server:8005
+    depends_on:
+      redis-agents:
+        condition: service_healthy
+      policy-server:
+        condition: service_started
+    networks:
+      - agent-network
+
+  # Item Agent
+  item-agent:
+    build:
+      context: .
+      dockerfile: ./agents/item_agent/Dockerfile
+    container_name: item-agent
+    ports:
+      - "10002:10002"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - REDIS_HOST=redis-agents
+      - REDIS_PORT=6379
+      - POLICY_SERVER_URL=http://policy-server:8005
+      - LOG_SERVER_URL=http://policy-server:8005
+    depends_on:
+      redis-agents:
+        condition: service_healthy
+      policy-server:
+        condition: service_started
+    networks:
+      - agent-network
+
+  # Quality Agent
+  quality-agent:
+    build:
+      context: .
+      dockerfile: ./agents/qulity_agent/Dockerfile
+    container_name: quality-agent
+    ports:
+      - "10003:10003"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - REDIS_HOST=redis-agents
+      - REDIS_PORT=6379
+      - POLICY_SERVER_URL=http://policy-server:8005
+      - LOG_SERVER_URL=http://policy-server:8005
+    depends_on:
+      redis-agents:
+        condition: service_healthy
+      policy-server:
+        condition: service_started
+    networks:
+      - agent-network
+
+  # Vehicle Agent
+  vehicle-agent:
+    build:
+      context: .
+      dockerfile: ./agents/vehicle_agent/Dockerfile
+    container_name: vehicle-agent
+    ports:
+      - "10004:10004"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - REDIS_HOST=redis-agents
+      - REDIS_PORT=6379
+      - POLICY_SERVER_URL=http://policy-server:8005
+      - LOG_SERVER_URL=http://policy-server:8005
+    depends_on:
+      redis-agents:
+        condition: service_healthy
+      policy-server:
+        condition: service_started
+    networks:
+      - agent-network
+
+networks:
+  agent-network:
+    driver: bridge
+
+volumes:
+  agent_reg_data:       # Agent Registry SQLite 데이터
+  redis-agents-data:    # 에이전트용 Redis 데이터
+  redis-iam-data:       # IAM 솔루션용 Redis 데이터

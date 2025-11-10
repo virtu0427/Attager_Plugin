@@ -1,0 +1,36 @@
+{
+  "name": "Item Agent",
+  "description": "item_agent.description",
+  "protocolVersion": "1.0",
+  "url": "http://localhost:10002",
+  "version": "1.0.0",
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": true,
+    "stateTransitionHistory": false
+  },
+  "defaultInputModes": [
+    "text",
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "text",
+    "text/plain"
+  ],
+  "skills": [
+    {
+      "id": "item_management",
+      "name": "Item Management",
+      "description": "상품 상세 조회 및 재고 추적을 수행한다",
+      "tags": [
+        "item",
+        "inventory",
+        "product management"
+      ],
+      "examples": [
+        "ITEM001 상품 상세 정보 알려줘",
+        "재고 수량 확인해줘"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,485 @@
+/* === CSS 변수 (테마) === */
+:root {
+  --bg-dark-primary: #1a1a2e; /* 매우 어두운 네이비 (메인 배경) */
+  --bg-dark-secondary: #1e1e3f; /* 살짝 밝은 네이비 (카드 배경) */
+  --border-color: #3a3a5f; /* 테두리 색상 */
+  --text-primary: #f0f0f5; /* 기본 텍스트 */
+  --text-secondary: #aab; /* 보조 텍스트 */
+  --accent-primary: #00aaff; /* 포인트 색상 (블루) */
+  --accent-hover: #0088cc; /* 포인트 호버 */
+  --critical-red: #ff4d4d; /* 위협 (Critical) */
+  --warning-yellow: #ffaa00; /* 위협 (Warning) */
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+}
+
+/* === 기본 스타일 === */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: var(--font-family);
+  background-color: var(--bg-dark-primary);
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+/* === 메인 레이아웃 === */
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  padding: 0 2rem;
+  height: 60px;
+  background-color: var(--bg-dark-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--accent-primary);
+  margin-right: 2rem;
+}
+
+/* === 네비게이션 (탭) === */
+.main-nav {
+  display: flex;
+  height: 100%;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  padding: 0 1.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+  transition: color 0.2s, border-bottom-color 0.2s;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  color: var(--text-primary);
+}
+
+.nav-link.active {
+  color: var(--accent-primary);
+  border-bottom-color: var(--accent-primary);
+}
+
+/* === 메인 컨텐츠 영역 === */
+.content-area {
+  flex-grow: 1;
+  padding: 2rem;
+  overflow-y: auto; /* 컨텐츠가 많아지면 스크롤 */
+}
+
+.content-page {
+  display: none;
+}
+
+.content-page.active {
+  display: block;
+}
+
+/* === 위젯 기본 스타일 === */
+.widget {
+  background-color: var(--bg-dark-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+  margin-bottom: 2rem; /* Grid 사용 시 gap으로 대체) */
+}
+
+/* Grid 레이아웃 내의 위젯은 margin-bottom 제거 (#ruleset 추가됨) */
+.content-page.active[id="dashboard"],
+.content-page.active[id="agents"],
+.content-page.active[id="logs"],
+.content-page.active[id="ruleset"] {
+  margin-bottom: 0;
+}
+.content-page.active[id="dashboard"] .widget,
+.content-page.active[id="agents"] .widget,
+.content-page.active[id="logs"] .widget,
+.content-page.active[id="ruleset"] .widget {
+  margin-bottom: 0;
+}
+
+.widget:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 170, 255, 0.1);
+}
+
+.widget-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* === 위젯 헤더 + 버튼 (추가됨) === */
+.widget-header-with-button {
+  display: flex;
+  justify-content: space-between; /* 제목(좌)과 버튼(우)을 분리 */
+  align-items: center;
+
+  /* 기존 .widget-title의 스타일을 이곳으로 이동 */
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* 래퍼 안의 제목은 여백/테두리 제거 */
+.widget-header-with-button .widget-title {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* === 1. 대시보드 페이지 (CSS Grid) === */
+#dashboard.active {
+  display: grid;
+  grid-template-columns: 2fr 1fr; /* 2:1 비율 */
+  grid-template-rows: auto auto;
+  gap: 2rem;
+}
+
+.widget-agent-graph {
+  grid-column: 1 / 2;
+  grid-row: 1 / 3; /* 2칸 차지 */
+  height: 600px;
+}
+
+.widget-traffic-stats {
+  grid-column: 2 / 3;
+  grid-row: 1 / 2;
+}
+
+.widget-threat-feed {
+  grid-column: 2 / 3;
+  grid-row: 2 / 3;
+}
+
+.widget-risk-score {
+  grid-column: 1 / 2;
+  grid-row: 3 / 4;
+  text-align: center;
+}
+
+/* 대시보드 위젯 내부 (샘플) */
+.threat-list {
+  list-style: none;
+}
+.threat-item {
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px dashed var(--border-color);
+}
+.threat-item:last-child {
+  border-bottom: none;
+}
+.threat-item.critical::before {
+  content: "🔴";
+  margin-right: 10px;
+}
+.threat-item.warning::before {
+  content: "🟡";
+  margin-right: 10px;
+}
+.risk-score-display {
+  font-size: 4rem;
+  font-weight: bold;
+  color: var(--critical-red);
+  margin: 1rem 0;
+}
+
+/* === 2. 에이전트 페이지 (CSS Grid) === */
+#agents.active {
+  display: grid;
+  grid-template-columns: 2fr 3fr; /* 3:1 비율 */
+  gap: 2rem;
+}
+
+.widget-agent-list {
+  grid-column: 1 / 2; /* 좌측 상단 */
+  grid-row: 1 / 2;
+}
+
+.widget-registry-log {
+  grid-column: 2 / 3; /* 우측 */
+  grid-row: 1 / 3; /* 우측 열 2칸 차지 */
+}
+
+.widget-agent-details {
+  grid-column: 1 / 2; /* 좌측 하단 */
+  grid-row: 2 / 3;
+}
+
+/* 에이전트 리스트 (List View) */
+.agent-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.agent-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background-color: var(--bg-dark-primary);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.agent-list-item:hover {
+  background-color: #2a2a4f;
+}
+
+.agent-list-item strong {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+/* 상태 표시 (Active / Idle) */
+.status-active,
+.status-idle {
+  font-size: 0.9em;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.status-active {
+  color: #4dff4d; /* 밝은 녹색 */
+  background-color: rgba(77, 255, 77, 0.1);
+  border: 1px solid rgba(77, 255, 77, 0.3);
+}
+
+.status-idle {
+  color: var(--text-secondary);
+  background-color: rgba(170, 170, 187, 0.1);
+  border: 1px solid rgba(170, 170, 187, 0.3);
+}
+
+/* === 버튼 스타일 (추가됨) === */
+.btn-primary,
+.btn-secondary {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.btn-primary {
+  background-color: var(--accent-primary);
+  color: var(--bg-dark-primary); /* 버튼 텍스트는 어둡게 */
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-hover);
+  box-shadow: 0 4px 12px rgba(0, 170, 255, 0.2);
+}
+
+.btn-secondary {
+  background-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background-color: #4a4a6f; /* --border-color 보다 살짝 밝게 */
+}
+
+/* === 3. 로그 페이지 (CSS Grid) - 수정됨 === */
+#logs.active {
+  display: grid;
+  grid-template-columns: 4fr 3fr; /* 1:2 비율 (좌측 1, 우측 2) */
+  grid-template-rows: auto 1fr; /* 상단 필터, 하단 리스트 */
+  gap: 2rem;
+}
+
+.widget-log-filter {
+  grid-column: 1 / 2; /* 좌측 상단 */
+  grid-row: 1 / 2;
+}
+
+.widget-log-list {
+  grid-column: 1 / 2; /* 좌측 하단 */
+  grid-row: 2 / 3;
+}
+
+.widget-log-details {
+  grid-column: 2 / 3; /* 우측 */
+  grid-row: 1 / 3; /* 우측 2칸 모두 차지 */
+}
+
+/* 로그 리스트 샘플 (테이블) */
+.log-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.log-table th,
+.log-table td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+.log-table th {
+  background-color: #2a2a4f;
+}
+.log-table tr:hover {
+  background-color: #2a2a4f;
+}
+
+/* === Ruleset 페이지 테이블 스타일 (추가됨) === */
+.ruleset-table {
+  width: 100%;
+  border-collapse: collapse; /* 테두리 겹침 방지 */
+}
+
+.ruleset-table th,
+.ruleset-table td {
+  padding: 0.85rem 0.75rem; /* 로그 테이블보다 약간 여유 있게 */
+  text-align: left;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ruleset-table th {
+  background-color: #2a2a4f; /* 헤더 배경색 */
+  font-weight: 600;
+}
+
+/* 테이블 행 호버 효과 및 선택 효과 */
+.ruleset-table tbody tr {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.ruleset-table tbody tr:hover {
+  background-color: #2a2a4f; /* 호버 시 배경색 */
+}
+
+.ruleset-table tbody tr.selected {
+  background-color: var(--accent-primary); /* 선택 시 배경색 */
+  color: var(--bg-dark-primary); /* 선택 시 글자색 */
+  font-weight: 500;
+}
+
+/* 선택된 행의 상태 배지 색상 반전 */
+.ruleset-table tbody tr.selected .status-active,
+.ruleset-table tbody tr.selected .status-disabled {
+  background-color: var(--text-primary);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+/* 비활성 상태 배지 (추가됨) */
+.status-disabled {
+  font-size: 0.9em;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: rgba(170, 170, 187, 0.1);
+  border: 1px solid rgba(170, 170, 187, 0.3);
+}
+
+/* === 4. 룰셋 페이지 (CSS Grid) (추가됨) === */
+#ruleset.active {
+  display: grid;
+  /* 2:3 비율로 좌우 분할 (리스트:상세) */
+  grid-template-columns: 2fr 3fr;
+  gap: 2rem;
+}
+
+/* * * === 5. 모달 (Dialog) 스타일 (신규 추가) === 
+ * */
+
+#ruleModal {
+  /* [1] 테마 적용: 기존 테마 변수를 사용합니다.
+  */
+  background-color: var(--bg-dark-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 170, 255, 0.1);
+  padding: 1.5rem;
+  width: 90%; /* 모바일도 고려 */
+  max-width: 450px; /* 최대 너비 고정 */
+
+  /* [2] 화면 정중앙 정렬 (이게 핵심입니다) 
+  */
+  top: 50%;
+  left: 50%; /* 👈 [1] 이 줄을 추가하세요 */
+  transform: translate(-50%, -50%);
+}
+
+/* 모달이 떴을 때 뒤에 깔리는 어두운 배경 */
+#ruleModal::backdrop {
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(2px);
+}
+
+/* 모달 내부 폼 스타일 */
+#ruleForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem; /* 폼 요소 사이의 간격 */
+}
+#ruleForm div {
+  display: flex;
+  flex-direction: column;
+}
+#ruleForm label {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* 폼 입력칸 (테마 적용) */
+#ruleForm input,
+#ruleForm select {
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-dark-primary);
+  color: var(--text-primary);
+  border-radius: 5px;
+  font-size: 1rem;
+}
+
+#ruleForm input:focus,
+#ruleForm select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(0, 170, 255, 0.3);
+}
+
+/* 모달 내부 버튼 정렬 */
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end; /* 버튼을 오른쪽으로 */
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
