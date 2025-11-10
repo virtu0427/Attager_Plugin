@@ -1,322 +1,172 @@
-/* === CSS 변수 (테마) === */
-:root {
-  --bg-dark-primary: #1a1a2e; /* 매우 어두운 네이비 (메인 배경) */
-  --bg-dark-secondary: #1e1e3f; /* 살짝 밝은 네이비 (카드 배경) */
-  --border-color: #3a3a5f; /* 테두리 색상 */
-  --text-primary: #f0f0f5; /* 기본 텍스트 */
-  --text-secondary: #aab; /* 보조 텍스트 */
-  --accent-primary: #00aaff; /* 포인트 색상 (블루) */
-  --accent-hover: #0088cc; /* 포인트 호버 */
-  --critical-red: #ff4d4d; /* 위협 (Critical) */
-  --warning-yellow: #ffaa00; /* 위협 (Warning) */
-  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    sans-serif;
+.ruleset-widget .table-container {
+  overflow: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* === 기본 스타일 === */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html,
-body {
-  height: 100%;
-  font-family: var(--font-family);
-  background-color: var(--bg-dark-primary);
-  color: var(--text-primary);
-  font-size: 16px;
-}
-
-/* === 메인 레이아웃 === */
-.app-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.app-header {
-  display: flex;
-  align-items: center;
-  padding: 0 2rem;
-  height: 60px;
-  background-color: var(--bg-dark-secondary);
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
-}
-
-.logo {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: var(--accent-primary);
-  margin-right: 2rem;
-}
-
-/* === 네비게이션 (탭) === */
-.main-nav {
-  display: flex;
-  height: 100%;
-}
-
-.nav-link {
-  display: flex;
-  align-items: center;
-  padding: 0 1.5rem;
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  text-decoration: none;
-  border-bottom: 3px solid transparent;
-  transition: color 0.2s, border-bottom-color 0.2s;
-  cursor: pointer;
-}
-
-.nav-link:hover {
-  color: var(--text-primary);
-}
-
-.nav-link.active {
-  color: var(--accent-primary);
-  border-bottom-color: var(--accent-primary);
-}
-
-/* === 메인 컨텐츠 영역 === */
-.content-area {
-  flex-grow: 1;
-  padding: 2rem;
-  overflow-y: auto; /* 컨텐츠가 많아지면 스크롤 */
-}
-
-.content-page {
-  display: none;
-}
-
-.content-page.active {
-  display: block;
-}
-
-/* === 위젯 기본 스타일 === */
-.widget {
-  background-color: var(--bg-dark-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 1.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
-  margin-bottom: 2rem; /* Grid 사용 시 gap으로 대체) */
-}
-
-/* Grid 레이아웃 내의 위젯은 margin-bottom 제거 */
-.content-page.active[id="ruleset"] {
-  margin-bottom: 0;
-}
-.content-page.active[id="ruleset"] .widget {
-  margin-bottom: 0;
-}
-
-.widget:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 24px rgba(0, 170, 255, 0.1);
-}
-
-.widget-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-/* === 위젯 헤더 + 버튼 (추가됨) === */
-.widget-header-with-button {
-  display: flex;
-  justify-content: space-between; /* 제목(좌)과 버튼(우)을 분리 */
-  align-items: center;
-
-  /* 기존 .widget-title의 스타일을 이곳으로 이동 */
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-/* 래퍼 안의 제목은 여백/테두리 제거 */
-.widget-header-with-button .widget-title {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-/* 상태 표시 (Active) */
-.status-active {
-  font-size: 0.9em;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-weight: 500;
-  color: #4dff4d; /* 밝은 녹색 */
-  background-color: rgba(77, 255, 77, 0.1);
-  border: 1px solid rgba(77, 255, 77, 0.3);
-}
-
-/* === 버튼 스타일 (추가됨) === */
-.btn-primary,
-.btn-secondary {
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
-}
-
-.btn-primary {
-  background-color: var(--accent-primary);
-  color: var(--bg-dark-primary); /* 버튼 텍스트는 어둡게 */
-}
-
-.btn-primary:hover {
-  background-color: var(--accent-hover);
-  box-shadow: 0 4px 12px rgba(0, 170, 255, 0.2);
-}
-
-.btn-secondary {
-  background-color: var(--border-color);
-  color: var(--text-primary);
-}
-
-.btn-secondary:hover {
-  background-color: #4a4a6f; /* --border-color 보다 살짝 밝게 */
-}
-
-/* === Ruleset 페이지 테이블 스타일 (추가됨) === */
 .ruleset-table {
   width: 100%;
-  border-collapse: collapse; /* 테두리 겹침 방지 */
+  border-collapse: collapse;
+  min-width: 640px;
 }
 
 .ruleset-table th,
 .ruleset-table td {
-  padding: 0.85rem 0.75rem; /* 로그 테이블보다 약간 여유 있게 */
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   text-align: left;
-  border-bottom: 1px solid var(--border-color);
 }
 
 .ruleset-table th {
-  background-color: #2a2a4f; /* 헤더 배경색 */
-  font-weight: 600;
-}
-
-/* 테이블 행 호버 효과 및 선택 효과 */
-.ruleset-table tbody tr {
-  cursor: pointer;
-  transition: background-color 0.2s;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  position: sticky;
+  top: 0;
+  backdrop-filter: blur(12px);
+  z-index: 1;
 }
 
 .ruleset-table tbody tr:hover {
-  background-color: #2a2a4f; /* 호버 시 배경색 */
+  background: rgba(101, 209, 255, 0.08);
 }
 
-.ruleset-table tbody tr.selected {
-  background-color: var(--accent-primary); /* 선택 시 배경색 */
-  color: var(--bg-dark-primary); /* 선택 시 글자색 */
-  font-weight: 500;
+.ruleset-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
 }
 
-/* 선택된 행의 상태 배지 색상 반전 */
-.ruleset-table tbody tr.selected .status-active,
-.ruleset-table tbody tr.selected .status-disabled {
-  background-color: var(--text-primary);
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
+.btn-small {
+  padding: 0.35rem 0.75rem;
 }
 
-/* 비활성 상태 배지 (추가됨) */
-.status-disabled {
-  font-size: 0.9em;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background-color: rgba(170, 170, 187, 0.1);
-  border: 1px solid rgba(170, 170, 187, 0.3);
+.ruleset-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 
-/* === 4. 룰셋 페이지 (CSS Grid) (추가됨) === */
-#ruleset.active {
+.form-grid {
   display: grid;
-  /* 2:3 비율로 좌우 분할 (리스트:상세) */
-  grid-template-columns: 2fr 3fr;
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
 }
 
-/* * * === 5. 모달 (Dialog) 스타일 (신규 추가) === 
- * */
-
-#ruleModal {
-  /* [1] 테마 적용: 기존 테마 변수를 사용합니다.
-  */
-  background-color: var(--bg-dark-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 170, 255, 0.1);
-  padding: 1.5rem;
-  width: 90%; /* 모바일도 고려 */
-  max-width: 450px; /* 최대 너비 고정 */
-
-  /* [2] 화면 정중앙 정렬 (이게 핵심입니다) 
-  */
-  top: 50%;
-  left: 50%; /* 👈 [1] 이 줄을 추가하세요 */
-  transform: translate(-50%, -50%);
-}
-
-/* 모달이 떴을 때 뒤에 깔리는 어두운 배경 */
-#ruleModal::backdrop {
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(2px);
-}
-
-/* 모달 내부 폼 스타일 */
-#ruleForm {
+.form-group {
   display: flex;
   flex-direction: column;
-  gap: 1rem; /* 폼 요소 사이의 간격 */
+  gap: 0.5rem;
 }
-#ruleForm div {
+
+.form-group.checkbox {
+  justify-content: flex-end;
+}
+
+.form-group.checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.ruleset-form textarea {
+  min-height: 140px;
+  font-family: "Fira Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+.ruleset-form textarea#ruleset-system-prompt {
+  min-height: 160px;
+  font-family: inherit;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ruleset-detail {
   display: flex;
   flex-direction: column;
-}
-#ruleForm label {
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: var(--text-secondary);
+  gap: 1.5rem;
 }
 
-/* 폼 입력칸 (테마 적용) */
-#ruleForm input,
-#ruleForm select {
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-dark-primary);
-  color: var(--text-primary);
-  border-radius: 5px;
-  font-size: 1rem;
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.25rem;
 }
 
-#ruleForm input:focus,
-#ruleForm select:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(0, 170, 255, 0.3);
-}
-
-/* 모달 내부 버튼 정렬 */
-.modal-buttons {
+.detail-grid ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
-  justify-content: flex-end; /* 버튼을 오른쪽으로 */
-  gap: 0.75rem;
-  margin-top: 1.5rem;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detail-json pre {
+  background: rgba(0, 0, 0, 0.38);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  max-height: 320px;
+  overflow: auto;
+  font-family: "Fira Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.85rem;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 12, 24, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-surface);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  width: min(720px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.modal-content {
+  flex: 1;
+  overflow: auto;
+}
+
+@media (max-width: 768px) {
+  .ruleset-table {
+    min-width: 100%;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
 }
