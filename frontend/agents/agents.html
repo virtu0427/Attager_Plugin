@@ -4,15 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>A2A Security Dashboard - Agents</title>
-
+    <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="style.css" />
     <script src="agents.js" defer></script>
   </head>
   <body>
-    <div class="app-container">
+    <div class="app-container" data-page="agents">
       <header class="app-header">
         <div class="logo">A2A SECURE</div>
-
         <nav class="main-nav">
           <a href="../dashboard.html" class="nav-link">Dashboard</a>
           <a href="agents.html" class="nav-link active">Agents</a>
@@ -23,34 +22,100 @@
 
       <main class="content-area">
         <section id="agents" class="content-page active">
-          <div class="widget widget-agent-list">
-            <h3 class="widget-title">에이전트 리스트 (List)</h3>
-            <div class="agent-list-container">
-              <!-- Agents will be loaded dynamically by agents.js -->
-              <div style="text-align: center; color: var(--text-secondary); padding: 20px;">
-                Loading agents...
+          <div class="agents-layout">
+            <aside class="widget agent-sidebar">
+              <div class="widget-header-with-button">
+                <h3 class="widget-title">Agents</h3>
+                <div class="widget-actions">
+                  <input
+                    type="search"
+                    id="agent-search"
+                    placeholder="Search agents"
+                    autocomplete="off"
+                  />
+                </div>
               </div>
-            </div>
-          </div>
+              <ul class="agent-list" id="agent-list">
+                <li class="empty-state">Loading agents…</li>
+              </ul>
+            </aside>
 
-          <div class="widget widget-registry-log">
-            <h3 class="widget-title">레지스트리 로그 (추가/삭제)</h3>
-            <ul class="threat-list">
-              <li class="threat-item">
-                Agent 'Orchestrator' added @ Admin (14:30)
-              </li>
-              <li class="threat-item">Agent 'Agent2' added @ Admin (14:31)</li>
-            </ul>
-          </div>
-
-          <div class="widget widget-agent-details">
-            <h3 class="widget-title">선택된 에이전트 세부 정보</h3>
-            <div style="color: var(--text-secondary)">
-              [ 에이전트 리스트 아이템 클릭 시 상세 정보 표시 영역 ]
-            </div>
+            <article class="widget agent-details" id="agent-details">
+              <div class="agent-details-placeholder">
+                <h3>Select an agent</h3>
+                <p>Choose an agent from the list to review plugins and IAM ruleset assignments.</p>
+              </div>
+            </article>
           </div>
         </section>
       </main>
     </div>
+
+    <template id="agent-item-template">
+      <li class="agent-item">
+        <div class="agent-info">
+          <span class="agent-name"></span>
+          <span class="agent-description"></span>
+        </div>
+        <span class="status-chip"></span>
+      </li>
+    </template>
+
+    <template id="agent-details-template">
+      <div class="agent-overview">
+        <div class="overview-header">
+          <div>
+            <h2 class="agent-title"></h2>
+            <p class="agent-subtitle"></p>
+          </div>
+          <div class="overview-meta">
+            <span class="status-chip"></span>
+            <span class="pill" data-role="created"></span>
+          </div>
+        </div>
+
+        <div class="plugins-panel">
+          <h3>Installed plugins</h3>
+          <ul class="plugin-list"></ul>
+        </div>
+      </div>
+
+      <form class="policy-editor" id="policy-editor">
+        <div class="policy-header">
+          <h3>IAM policy assignments</h3>
+          <label class="toggle">
+            <input type="checkbox" id="policy-enabled" />
+            <span>Policy enabled</span>
+          </label>
+        </div>
+
+        <div class="policy-columns">
+          <div class="policy-column" data-policy-type="prompt_validation">
+            <h4>Prompt validation</h4>
+            <p class="policy-description">
+              Assign rulesets that validate inbound prompts before execution.
+            </p>
+            <div class="ruleset-list"></div>
+          </div>
+
+          <div class="policy-column" data-policy-type="tool_validation">
+            <h4>Tool validation</h4>
+            <p class="policy-description">Control tool invocation and validate arguments.</p>
+            <div class="ruleset-list"></div>
+          </div>
+
+          <div class="policy-column" data-policy-type="response_filtering">
+            <h4>Response filtering</h4>
+            <p class="policy-description">Filter or redact generated responses.</p>
+            <div class="ruleset-list"></div>
+          </div>
+        </div>
+
+        <div class="policy-actions">
+          <span class="status-message" id="policy-status" role="status"></span>
+          <button type="submit" class="btn-primary">Save assignments</button>
+        </div>
+      </form>
+    </template>
   </body>
 </html>

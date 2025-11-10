@@ -1,567 +1,287 @@
-// Ruleset Management JavaScript
 const API_BASE = window.location.origin;
 
-// Load rulesets on page load
-document.addEventListener('DOMContentLoaded', () => {
-    loadRulesets();
-    
-    // Setup Add New Rule button
-    const addBtn = document.getElementById('openModalBtn');
-    if (addBtn) {
-        addBtn.onclick = showAddRulesetModal;
-    }
+let rulesets = [];
+
+window.addEventListener('DOMContentLoaded', () => {
+  loadRulesets();
+  bindControls();
 });
 
-async function loadRulesets() {
-    try {
-        const response = await fetch(`${API_BASE}/api/rulesets`);
-        const rulesets = await response.json();
-        
-        displayRulesets(rulesets);
-    } catch (error) {
-        console.error('Failed to load rulesets:', error);
-        showError('Failed to load rulesets');
-    }
+function bindControls() {
+  const createButton = document.getElementById('open-create-ruleset');
+  if (createButton) {
+    createButton.addEventListener('click', () => openFormModal());
+  }
+
+  const modal = document.getElementById('ruleset-modal');
+  const closeButton = document.getElementById('close-ruleset-modal');
+  if (modal) {
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) {
+        closeModal();
+      }
+    });
+  }
+  if (closeButton) {
+    closeButton.addEventListener('click', closeModal);
+  }
 }
 
-function displayRulesets(rulesets) {
-    const tbody = document.querySelector('.ruleset-table tbody');
-    if (!tbody) return;
-    
-    tbody.innerHTML = '';
-    
-    if (rulesets.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-secondary);">No rulesets found</td></tr>';
-        return;
+async function loadRulesets() {
+  try {
+    const response = await fetch(`${API_BASE}/api/rulesets`);
+    if (!response.ok) throw new Error('Failed to load rulesets');
+    rulesets = await response.json();
+    renderRulesetTable();
+  } catch (error) {
+    console.error('Failed to load rulesets', error);
+    const tbody = document.getElementById('ruleset-table-body');
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Unable to load rulesets.</td></tr>';
     }
-    
-    rulesets.forEach(ruleset => {
-        const row = document.createElement('tr');
-        
-        const statusClass = ruleset.enabled ? 'status-active' : 'status-inactive';
-        const statusText = ruleset.enabled ? 'Active' : 'Inactive';
-        
-        row.innerHTML = `
-            <td>${ruleset.ruleset_id}</td>
-            <td>${ruleset.name || ruleset.ruleset_id}</td>
-            <td>${formatType(ruleset.type)}</td>
-            <td><span class="${statusClass}">${statusText}</span></td>
-            <td>
-                <button onclick="showRulesetDetails('${ruleset.ruleset_id}')" 
-                    style="padding: 5px 10px; margin-right: 5px; cursor: pointer; background: var(--primary); border: none; border-radius: 4px; color: #000;">View</button>
-                <button onclick="editRuleset('${ruleset.ruleset_id}')" 
-                    style="padding: 5px 10px; margin-right: 5px; cursor: pointer; background: #66aaff; border: none; border-radius: 4px; color: #000;">Edit</button>
-                <button onclick="deleteRuleset('${ruleset.ruleset_id}')"
-                    style="padding: 5px 10px; cursor: pointer; background: #ff4444; border: none; border-radius: 4px; color: #fff;">Delete</button>
-            </td>
-        `;
-        
-        tbody.appendChild(row);
+  }
+}
+
+function renderRulesetTable() {
+  const tbody = document.getElementById('ruleset-table-body');
+  const template = document.getElementById('ruleset-row-template');
+  if (!tbody || !template) return;
+
+  tbody.innerHTML = '';
+
+  if (!rulesets || rulesets.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No rulesets defined yet.</td></tr>';
+    return;
+  }
+
+  rulesets
+    .slice()
+    .sort((a, b) => (a.name || a.ruleset_id).localeCompare(b.name || b.ruleset_id))
+    .forEach((ruleset) => {
+      const clone = template.content.cloneNode(true);
+      clone.querySelector('.ruleset-id').textContent = ruleset.ruleset_id;
+      clone.querySelector('.ruleset-name').textContent = ruleset.name || ruleset.ruleset_id;
+      clone.querySelector('.ruleset-type').textContent = formatType(ruleset.type);
+
+      const statusCell = clone.querySelector('.ruleset-status');
+      if (statusCell) {
+        const chip = document.createElement('span');
+        chip.className = `status-chip ${ruleset.enabled ? 'status-active' : 'status-inactive'}`;
+        chip.textContent = ruleset.enabled ? 'ACTIVE' : 'INACTIVE';
+        statusCell.appendChild(chip);
+      }
+
+      clone.querySelector('.ruleset-updated').textContent = formatDate(ruleset.updated_at || ruleset.created_at);
+
+      const actionCell = clone.querySelector('.ruleset-actions');
+      if (actionCell) {
+        actionCell.querySelector('[data-action="view"]').addEventListener('click', () => openDetailModal(ruleset));
+        actionCell.querySelector('[data-action="edit"]').addEventListener('click', () => openFormModal(ruleset));
+        actionCell.querySelector('[data-action="delete"]').addEventListener('click', () => confirmDelete(ruleset));
+      }
+
+      tbody.appendChild(clone);
     });
 }
 
 function formatType(type) {
-    const typeMap = {
-        'prompt_validation': 'Prompt Validation',
-        'tool_validation': 'Tool Validation',
-        'response_filtering': 'Response Filtering'
-    };
-    return typeMap[type] || type || 'N/A';
+  const map = {
+    prompt_validation: 'Prompt validation',
+    tool_validation: 'Tool validation',
+    response_filtering: 'Response filtering',
+  };
+  return map[type] || type || 'Unknown';
 }
 
-async function showRulesetDetails(rulesetId) {
-    try {
-        const response = await fetch(`${API_BASE}/api/rulesets/${rulesetId}`);
-        const ruleset = await response.json();
-        
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        `;
-        
-        let rulesHtml = '';
-        if (ruleset.type === 'prompt_validation') {
-            rulesHtml = `
-                <h4>System Prompt:</h4>
-                <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word;">${ruleset.system_prompt || ''}</pre>
-                <p><strong>Model:</strong> ${ruleset.model || 'gemini-2.0-flash-exp'}</p>
-            `;
-        } else if (ruleset.type === 'tool_validation') {
-            rulesHtml = `
-                <h4>Tool Name:</h4>
-                <p>${ruleset.tool_name || 'N/A'}</p>
-                <h4>Validation Rules:</h4>
-                <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(ruleset.rules, null, 2)}</pre>
-            `;
-        } else if (ruleset.type === 'response_filtering') {
-            rulesHtml = `
-                <h4>Blocked Keywords:</h4>
-                <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(ruleset.blocked_keywords || [], null, 2)}</pre>
-            `;
-        }
-        
-        modal.innerHTML = `
-            <div style="
-                background: var(--card-bg);
-                border: 1px solid var(--ring);
-                border-radius: 14px;
-                padding: 24px;
-                max-width: 700px;
-                max-height: 80vh;
-                overflow-y: auto;
-                color: var(--fg);
-            ">
-                <h2>${ruleset.name || ruleset.ruleset_id}</h2>
-                <p style="color: var(--text-secondary)">${ruleset.description || ''}</p>
-                <p><strong>Type:</strong> ${formatType(ruleset.type)}</p>
-                <p><strong>Enabled:</strong> ${ruleset.enabled ? 'Yes' : 'No'}</p>
-                
-                ${rulesHtml}
-                
-                <button onclick="this.closest('.modal-overlay').remove()" style="
-                    margin-top: 20px;
-                    padding: 10px 20px;
-                    background: var(--primary);
-                    border: none;
-                    border-radius: 8px;
-                    cursor: pointer;
-                    color: #000;
-                    font-weight: bold;
-                ">Close</button>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        modal.onclick = (e) => {
-            if (e.target === modal) modal.remove();
-        };
-        
-    } catch (error) {
-        console.error('Failed to load ruleset details:', error);
-        showError('Failed to load ruleset details');
-    }
+function formatDate(dateString) {
+  if (!dateString) return '—';
+  return new Date(dateString).toLocaleString();
 }
 
-function showAddRulesetModal() {
-    const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.7);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-    `;
-    
-    modal.innerHTML = `
-        <div style="
-            background: var(--card-bg);
-            border: 1px solid var(--ring);
-            border-radius: 14px;
-            padding: 24px;
-            max-width: 700px;
-            max-height: 85vh;
-            overflow-y: auto;
-            color: var(--fg);
-        ">
-            <h2>Add New Ruleset</h2>
-            <form id="addRulesetForm">
-                <div style="margin-bottom: 15px;">
-                    <label><strong>Ruleset ID:</strong></label><br>
-                    <input type="text" name="ruleset_id" required placeholder="e.g., ruleset_my_custom_rule" 
-                        style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid var(--ring); color: var(--fg); border-radius: 4px;">
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <label><strong>Name:</strong></label><br>
-                    <input type="text" name="name" required placeholder="Human-readable name" 
-                        style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid var(--ring); color: var(--fg); border-radius: 4px;">
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <label><strong>Type:</strong></label><br>
-                    <select name="type" id="rulesetType" required onchange="updateRulesetFields(this.value, 'add')" 
-                        style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid var(--ring); color: var(--fg); border-radius: 4px;">
-                        <option value="prompt_validation">Prompt Validation</option>
-                        <option value="tool_validation">Tool Validation</option>
-                        <option value="response_filtering">Response Filtering</option>
-                    </select>
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <label><strong>Description:</strong></label><br>
-                    <textarea name="description" rows="2" placeholder="Describe what this ruleset does" 
-                        style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid var(--ring); color: var(--fg); border-radius: 4px;"></textarea>
-                </div>
-                
-                <div id="dynamicFields"></div>
-                
-                <div style="margin-bottom: 15px;">
-                    <label>
-                        <input type="checkbox" name="enabled" checked style="margin-right: 5px;">
-                        <strong>Enabled</strong>
-                    </label>
-                </div>
-                
-                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                    <button type="submit" style="
-                        padding: 10px 20px;
-                        background: var(--primary);
-                        border: none;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        color: #000;
-                        font-weight: bold;
-                    ">Create Ruleset</button>
-                    <button type="button" onclick="this.closest('.modal-overlay').remove()" style="
-                        padding: 10px 20px;
-                        background: #666;
-                        border: none;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        color: #fff;
-                    ">Cancel</button>
-                </div>
-            </form>
-        </div>
-    `;
-    
-    document.body.appendChild(modal);
-    
-    // Initialize with prompt_validation fields
-    updateRulesetFields('prompt_validation', 'add');
-    
-    const form = modal.querySelector('#addRulesetForm');
-    form.onsubmit = async (e) => {
-        e.preventDefault();
-        await handleRulesetSubmit(e, 'create');
-    };
+function openDetailModal(ruleset) {
+  const modal = document.getElementById('ruleset-modal');
+  const title = document.getElementById('ruleset-modal-title');
+  const body = document.getElementById('ruleset-modal-body');
+  const template = document.getElementById('ruleset-detail-template');
+  if (!modal || !title || !body || !template) return;
+
+  body.innerHTML = '';
+  title.textContent = ruleset.name || ruleset.ruleset_id;
+
+  const node = template.content.cloneNode(true);
+  const wrapper = node.querySelector('.ruleset-detail');
+  wrapper.querySelector('[data-field="ruleset_id"]').textContent = ruleset.ruleset_id;
+  wrapper.querySelector('[data-field="type"]').textContent = formatType(ruleset.type);
+  wrapper.querySelector('[data-field="status"]').textContent = ruleset.enabled ? 'Enabled' : 'Disabled';
+  wrapper.querySelector('[data-field="updated"]').textContent = formatDate(ruleset.updated_at || ruleset.created_at);
+  wrapper.querySelector('[data-field="description"]').textContent = ruleset.description || 'No description provided.';
+
+  const configuration = { ...ruleset };
+  wrapper.querySelector('[data-field="json"]').textContent = JSON.stringify(configuration, null, 2);
+
+  body.appendChild(wrapper);
+  openModal();
 }
 
-async function editRuleset(rulesetId) {
-    try {
-        const response = await fetch(`${API_BASE}/api/rulesets/${rulesetId}`);
-        const ruleset = await response.json();
-        
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay';
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-        `;
-        
-        const enabledChecked = ruleset.enabled ? 'checked' : '';
-        
-        modal.innerHTML = `
-            <div style="
-                background: var(--card-bg);
-                border: 1px solid var(--ring);
-                border-radius: 14px;
-                padding: 24px;
-                max-width: 700px;
-                max-height: 85vh;
-                overflow-y: auto;
-                color: var(--fg);
-            ">
-                <h2>Edit Ruleset: ${ruleset.name}</h2>
-                <form id="editRulesetForm" data-ruleset-id="${rulesetId}">
-                    <div style="margin-bottom: 15px;">
-                        <label><strong>Ruleset ID:</strong></label><br>
-                        <input type="text" value="${ruleset.ruleset_id}" disabled 
-                            style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(100,100,100,0.3); border: 1px solid var(--ring); color: var(--muted); border-radius: 4px;">
-                        <small style="color: var(--text-secondary);">ID cannot be changed</small>
-                    </div>
-                    
-                    <div style="margin-bottom: 15px;">
-                        <label><strong>Name:</strong></label><br>
-                        <input type="text" name="name" value="${ruleset.name || ''}" required 
-                            style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid var(--ring); color: var(--fg); border-radius: 4px;">
-                    </div>
-                    
-                    <div style="margin-bottom: 15px;">
-                        <label><strong>Type:</strong></label><br>
-                        <select name="type" id="editRulesetType" required onchange="updateRulesetFields(this.value, 'edit', ${JSON.stringify(ruleset).replace(/"/g, '&quot;')})" 
-                            style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid var(--ring); color: var(--fg); border-radius: 4px;">
-                            <option value="prompt_validation" ${ruleset.type === 'prompt_validation' ? 'selected' : ''}>Prompt Validation</option>
-                            <option value="tool_validation" ${ruleset.type === 'tool_validation' ? 'selected' : ''}>Tool Validation</option>
-                            <option value="response_filtering" ${ruleset.type === 'response_filtering' ? 'selected' : ''}>Response Filtering</option>
-                        </select>
-                    </div>
-                    
-                    <div style="margin-bottom: 15px;">
-                        <label><strong>Description:</strong></label><br>
-                        <textarea name="description" rows="2" 
-                            style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid var(--ring); color: var(--fg); border-radius: 4px;">${ruleset.description || ''}</textarea>
-                    </div>
-                    
-                    <div id="dynamicFields"></div>
-                    
-                    <div style="margin-bottom: 15px;">
-                        <label>
-                            <input type="checkbox" name="enabled" ${enabledChecked} style="margin-right: 5px;">
-                            <strong>Enabled</strong>
-                        </label>
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px; margin-top: 20px;">
-                        <button type="submit" style="
-                            padding: 10px 20px;
-                            background: var(--primary);
-                            border: none;
-                            border-radius: 8px;
-                            cursor: pointer;
-                            color: #000;
-                            font-weight: bold;
-                        ">Update Ruleset</button>
-                        <button type="button" onclick="this.closest('.modal-overlay').remove()" style="
-                            padding: 10px 20px;
-                            background: #666;
-                            border: none;
-                            border-radius: 8px;
-                            cursor: pointer;
-                            color: #fff;
-                        ">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Initialize with current ruleset type and data
-        updateRulesetFields(ruleset.type, 'edit', ruleset);
-        
-        const form = modal.querySelector('#editRulesetForm');
-        form.onsubmit = async (e) => {
-            e.preventDefault();
-            await handleRulesetSubmit(e, 'update', rulesetId);
-        };
-        
-    } catch (error) {
-        console.error('Failed to load ruleset for editing:', error);
-        showError('Failed to load ruleset for editing');
-    }
+function openFormModal(ruleset) {
+  const modal = document.getElementById('ruleset-modal');
+  const title = document.getElementById('ruleset-modal-title');
+  const body = document.getElementById('ruleset-modal-body');
+  const template = document.getElementById('ruleset-form-template');
+  if (!modal || !title || !body || !template) return;
+
+  body.innerHTML = '';
+  const node = template.content.cloneNode(true);
+  const form = node.querySelector('#ruleset-form');
+  const typeSelect = node.querySelector('#ruleset-type');
+  const statusMessage = node.querySelector('#ruleset-form-status');
+
+  if (ruleset) {
+    title.textContent = 'Edit ruleset';
+    populateForm(form, ruleset);
+    form.dataset.mode = 'edit';
+  } else {
+    title.textContent = 'Create ruleset';
+    form.dataset.mode = 'create';
+  }
+
+  if (typeSelect) {
+    typeSelect.addEventListener('change', () => toggleTypeFields(typeSelect.value, form));
+    toggleTypeFields(typeSelect.value, form);
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    await submitForm(form, statusMessage, ruleset);
+  });
+
+  body.appendChild(node);
+  openModal();
 }
 
-function updateRulesetFields(type, mode, existingData = null) {
-    const container = document.getElementById('dynamicFields');
-    if (!container) return;
-    
-    container.innerHTML = '';
-    
-    if (type === 'prompt_validation') {
-        const systemPrompt = existingData?.system_prompt || '';
-        const model = existingData?.model || 'gemini-2.0-flash-exp';
-        
-        container.innerHTML = `
-            <div style="margin-bottom: 15px;">
-                <label><strong>System Prompt:</strong></label><br>
-                <textarea name="system_prompt" rows="10" required placeholder="Enter the system prompt for validation..." 
-                    style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid var(--ring); color: var(--fg); border-radius: 4px; font-family: monospace; font-size: 13px;">${systemPrompt}</textarea>
-                <small style="color: var(--text-secondary);">Use {prompt} placeholder for user input</small>
-            </div>
-            
-            <div style="margin-bottom: 15px;">
-                <label><strong>Model:</strong></label><br>
-                <select name="model" style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid var(--ring); color: var(--fg); border-radius: 4px;">
-                    <option value="gemini-2.0-flash-exp" ${model === 'gemini-2.0-flash-exp' ? 'selected' : ''}>gemini-2.0-flash-exp</option>
-                    <option value="gemini-1.5-flash" ${model === 'gemini-1.5-flash' ? 'selected' : ''}>gemini-1.5-flash</option>
-                    <option value="gemini-1.5-pro" ${model === 'gemini-1.5-pro' ? 'selected' : ''}>gemini-1.5-pro</option>
-                </select>
-            </div>
-        `;
-    } else if (type === 'tool_validation') {
-        const toolName = existingData?.tool_name || '';
-        const rules = existingData?.rules ? JSON.stringify(existingData.rules, null, 2) : '{\n  "allowed_values": [],\n  "max_length": 100\n}';
-        
-        container.innerHTML = `
-            <div style="margin-bottom: 15px;">
-                <label><strong>Tool Name:</strong></label><br>
-                <input type="text" name="tool_name" value="${toolName}" required placeholder="e.g., call_remote_agent" 
-                    style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid var(--ring); color: var(--fg); border-radius: 4px;">
-            </div>
-            
-            <div style="margin-bottom: 15px;">
-                <label><strong>Validation Rules (JSON):</strong></label><br>
-                <textarea name="rules" rows="10" required placeholder='{"allowed_values": [], "max_length": 100}' 
-                    style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid var(--ring); color: var(--fg); border-radius: 4px; font-family: monospace; font-size: 13px;">${rules}</textarea>
-                <small style="color: var(--text-secondary);">Enter validation rules as JSON</small>
-            </div>
-        `;
-    } else if (type === 'response_filtering') {
-        const blockedKeywords = existingData?.blocked_keywords ? JSON.stringify(existingData.blocked_keywords, null, 2) : '["password", "credit_card", "ssn"]';
-        
-        container.innerHTML = `
-            <div style="margin-bottom: 15px;">
-                <label><strong>Blocked Keywords (JSON Array):</strong></label><br>
-                <textarea name="blocked_keywords" rows="8" required placeholder='["keyword1", "keyword2"]' 
-                    style="width: 100%; padding: 8px; margin-top: 5px; background: rgba(255,255,255,0.1); border: 1px solid var(--ring); color: var(--fg); border-radius: 4px; font-family: monospace; font-size: 13px;">${blockedKeywords}</textarea>
-                <small style="color: var(--text-secondary);">List of keywords to block in responses</small>
-            </div>
-        `;
-    }
+function populateForm(form, ruleset) {
+  form.querySelector('#ruleset-id').value = ruleset.ruleset_id;
+  form.querySelector('#ruleset-id').disabled = true;
+  form.querySelector('#ruleset-name').value = ruleset.name || '';
+  form.querySelector('#ruleset-type').value = ruleset.type || 'prompt_validation';
+  form.querySelector('#ruleset-enabled').checked = ruleset.enabled !== false;
+  form.querySelector('#ruleset-description').value = ruleset.description || '';
+  form.querySelector('#ruleset-system-prompt').value = ruleset.system_prompt || '';
+  form.querySelector('#ruleset-model').value = ruleset.model || '';
+  form.querySelector('#ruleset-tool-name').value = ruleset.tool_name || '';
+  form.querySelector('#ruleset-rules').value = ruleset.rules ? JSON.stringify(ruleset.rules, null, 2) : '';
+  form.querySelector('#ruleset-blocked').value = ruleset.blocked_keywords
+    ? JSON.stringify(ruleset.blocked_keywords, null, 2)
+    : '';
 }
 
-async function handleRulesetSubmit(event, action, rulesetId = null) {
-    const form = event.target;
-    const formData = new FormData(form);
-    
-    const data = {
-        name: formData.get('name'),
-        type: formData.get('type'),
-        description: formData.get('description') || '',
-        enabled: formData.get('enabled') === 'on'
-    };
-    
-    // Add ruleset_id for creation
-    if (action === 'create') {
-        data.ruleset_id = formData.get('ruleset_id');
+function toggleTypeFields(type, form) {
+  const fields = form.querySelectorAll('[data-field]');
+  fields.forEach((group) => {
+    const fieldType = group.dataset.field;
+    group.classList.toggle('hidden', fieldType && fieldType !== type);
+  });
+}
+
+async function submitForm(form, statusElement, existing) {
+  const submitButton = form.querySelector('button[type="submit"]');
+  const formData = new FormData(form);
+
+  const payload = {
+    ruleset_id: formData.get('ruleset_id') || existing?.ruleset_id,
+    name: formData.get('name'),
+    type: formData.get('type'),
+    description: formData.get('description'),
+    enabled: formData.get('enabled') === 'on',
+  };
+
+  if (payload.type === 'prompt_validation') {
+    payload.system_prompt = formData.get('system_prompt');
+    payload.model = formData.get('model');
+  } else if (payload.type === 'tool_validation') {
+    payload.tool_name = formData.get('tool_name');
+    payload.rules = safeJsonParse(formData.get('rules')) || {};
+  } else if (payload.type === 'response_filtering') {
+    payload.blocked_keywords = safeJsonParse(formData.get('blocked_keywords')) || [];
+  }
+
+  if (statusElement) {
+    statusElement.textContent = 'Saving…';
+    statusElement.classList.remove('error');
+  }
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = 'Saving…';
+  }
+
+  try {
+    const method = existing ? 'PUT' : 'POST';
+    const url = existing
+      ? `${API_BASE}/api/rulesets/${encodeURIComponent(existing.ruleset_id)}`
+      : `${API_BASE}/api/rulesets`;
+
+    const response = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) throw new Error('Failed to save ruleset');
+
+    await loadRulesets();
+    closeModal();
+  } catch (error) {
+    console.error('Failed to save ruleset', error);
+    if (statusElement) {
+      statusElement.textContent = 'Unable to save ruleset. Check input values.';
+      statusElement.classList.add('error');
     }
-    
-    // Add type-specific fields
-    if (data.type === 'prompt_validation') {
-        data.system_prompt = formData.get('system_prompt');
-        data.model = formData.get('model');
-    } else if (data.type === 'tool_validation') {
-        data.tool_name = formData.get('tool_name');
-        try {
-            data.rules = JSON.parse(formData.get('rules'));
-        } catch (e) {
-            showError('Invalid JSON in rules field');
-            return;
-        }
-    } else if (data.type === 'response_filtering') {
-        try {
-            data.blocked_keywords = JSON.parse(formData.get('blocked_keywords'));
-        } catch (e) {
-            showError('Invalid JSON in blocked_keywords field');
-            return;
-        }
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = 'Save ruleset';
     }
-    
-    try {
-        let url = `${API_BASE}/api/rulesets`;
-        let method = 'POST';
-        
-        if (action === 'update') {
-            url = `${API_BASE}/api/rulesets/${rulesetId}`;
-            method = 'PUT';
-        }
-        
-        const response = await fetch(url, {
-            method: method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        
-        if (response.ok) {
-            // Close modal
-            const modal = form.closest('.modal-overlay');
-            if (modal) modal.remove();
-            
-            // Reload rulesets
-            loadRulesets();
-            
-            const successMsg = action === 'create' ? 'Ruleset created successfully' : 'Ruleset updated successfully';
-            showSuccess(successMsg);
-        } else {
-            const error = await response.json();
-            showError(`Failed to ${action} ruleset: ` + (error.error || 'Unknown error'));
-        }
-    } catch (error) {
-        console.error(`Failed to ${action} ruleset:`, error);
-        showError(`Failed to ${action} ruleset`);
-    }
+  }
+}
+
+function safeJsonParse(value) {
+  if (!value) return undefined;
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    console.warn('Invalid JSON input', value);
+    return undefined;
+  }
+}
+
+function confirmDelete(ruleset) {
+  if (!confirm(`Delete ruleset ${ruleset.ruleset_id}?`)) return;
+  deleteRuleset(ruleset.ruleset_id);
 }
 
 async function deleteRuleset(rulesetId) {
-    if (!confirm(`Are you sure you want to delete ruleset: ${rulesetId}?`)) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`${API_BASE}/api/rulesets/${rulesetId}`, {
-            method: 'DELETE'
-        });
-        
-        if (response.ok) {
-            loadRulesets();
-            showSuccess('Ruleset deleted successfully');
-        } else {
-            const error = await response.json();
-            showError('Failed to delete ruleset: ' + (error.error || 'Unknown error'));
-        }
-    } catch (error) {
-        console.error('Failed to delete ruleset:', error);
-        showError('Failed to delete ruleset');
-    }
+  try {
+    const response = await fetch(`${API_BASE}/api/rulesets/${encodeURIComponent(rulesetId)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Failed to delete ruleset');
+    await loadRulesets();
+  } catch (error) {
+    console.error('Failed to delete ruleset', error);
+    alert('Unable to delete ruleset.');
+  }
 }
 
-function showError(message) {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #ff4444;
-        color: #fff;
-        padding: 15px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        z-index: 10000;
-        animation: slideIn 0.3s ease;
-    `;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
+function openModal() {
+  const modal = document.getElementById('ruleset-modal');
+  if (modal) {
+    modal.classList.remove('hidden');
+  }
 }
 
-function showSuccess(message) {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: var(--kinic, #4ef6b2);
-        color: #000;
-        padding: 15px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        z-index: 10000;
-        animation: slideIn 0.3s ease;
-    `;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
+function closeModal() {
+  const modal = document.getElementById('ruleset-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
 }

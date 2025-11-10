@@ -3,7 +3,7 @@ Redis Database Manager for IAM Policy System
 """
 import redis
 import json
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 import os
 
@@ -34,6 +34,10 @@ class IAMDatabase:
                 "description": "Main orchestrator agent",
                 "status": "active",
                 "policy_id": "policy_orchestrator",
+                "plugins": json.dumps([
+                    {"name": "Coordinator", "type": "core", "status": "active"},
+                    {"name": "Task Router", "type": "routing", "status": "active"}
+                ]),
                 "created_at": datetime.now().isoformat()
             },
             {
@@ -42,6 +46,10 @@ class IAMDatabase:
                 "description": "Handles delivery operations",
                 "status": "active",
                 "policy_id": "policy_delivery",
+                "plugins": json.dumps([
+                    {"name": "Order Intake", "type": "ingest", "status": "active"},
+                    {"name": "Route Planner", "type": "optimizer", "status": "active"}
+                ]),
                 "created_at": datetime.now().isoformat()
             },
             {
@@ -50,6 +58,10 @@ class IAMDatabase:
                 "description": "Manages item information",
                 "status": "active",
                 "policy_id": "policy_item",
+                "plugins": json.dumps([
+                    {"name": "Catalog Sync", "type": "sync", "status": "active"},
+                    {"name": "Inventory Guard", "type": "monitor", "status": "active"}
+                ]),
                 "created_at": datetime.now().isoformat()
             },
             {
@@ -58,6 +70,10 @@ class IAMDatabase:
                 "description": "Quality assurance agent",
                 "status": "active",
                 "policy_id": "policy_quality",
+                "plugins": json.dumps([
+                    {"name": "Inspection", "type": "monitor", "status": "active"},
+                    {"name": "Remediation", "type": "action", "status": "standby"}
+                ]),
                 "created_at": datetime.now().isoformat()
             },
             {
@@ -66,6 +82,10 @@ class IAMDatabase:
                 "description": "Vehicle management agent",
                 "status": "active",
                 "policy_id": "policy_vehicle",
+                "plugins": json.dumps([
+                    {"name": "Telemetry", "type": "ingest", "status": "active"},
+                    {"name": "Maintenance Advisor", "type": "analytics", "status": "active"}
+                ]),
                 "created_at": datetime.now().isoformat()
             }
         ]
@@ -181,6 +201,23 @@ class IAMDatabase:
             self.redis_client.sadd("policies:all", policy_id)
     
     # ========== Agent Operations ==========
+    def _serialize_agent_data(self, data: Dict) -> Dict:
+        """Prepare agent data for storage in Redis"""
+        serialized = data.copy()
+        if "plugins" in serialized and isinstance(serialized["plugins"], (list, dict)):
+            serialized["plugins"] = json.dumps(serialized["plugins"])
+        return serialized
+
+    def _parse_agent_data(self, agent_data: Dict) -> Dict:
+        """Parse agent data retrieved from Redis"""
+        parsed = agent_data.copy()
+        if "plugins" in parsed:
+            try:
+                parsed["plugins"] = json.loads(parsed["plugins"])
+            except Exception:
+                parsed["plugins"] = []
+        return parsed
+
     def get_all_agents(self) -> List[Dict]:
         """Get all agents"""
         agent_ids = self.redis_client.smembers("agents:all")
@@ -188,28 +225,28 @@ class IAMDatabase:
         for agent_id in agent_ids:
             agent_data = self.redis_client.hgetall(f"agents:{agent_id}")
             if agent_data:
-                agents.append(agent_data)
+                agents.append(self._parse_agent_data(agent_data))
         return agents
-    
+
     def get_agent(self, agent_id: str) -> Optional[Dict]:
         """Get agent by ID"""
         agent_data = self.redis_client.hgetall(f"agents:{agent_id}")
-        return agent_data if agent_data else None
-    
+        return self._parse_agent_data(agent_data) if agent_data else None
+
     def update_agent(self, agent_id: str, data: Dict) -> bool:
         """Update agent"""
         if not self.redis_client.exists(f"agents:{agent_id}"):
             return False
-        self.redis_client.hset(f"agents:{agent_id}", mapping=data)
+        self.redis_client.hset(f"agents:{agent_id}", mapping=self._serialize_agent_data(data))
         return True
-    
+
     def create_agent(self, data: Dict) -> bool:
         """Create new agent"""
         agent_id = data.get("agent_id")
         if not agent_id:
             return False
         data["created_at"] = datetime.now().isoformat()
-        self.redis_client.hset(f"agents:{agent_id}", mapping=data)
+        self.redis_client.hset(f"agents:{agent_id}", mapping=self._serialize_agent_data(data))
         self.redis_client.sadd("agents:all", agent_id)
         return True
     
@@ -225,6 +262,11 @@ class IAMDatabase:
                 if "rules" in ruleset_data:
                     try:
                         ruleset_data["rules"] = json.loads(ruleset_data["rules"])
+                    except:
+                        pass
+                if "blocked_keywords" in ruleset_data:
+                    try:
+                        ruleset_data["blocked_keywords"] = json.loads(ruleset_data["blocked_keywords"])
                     except:
                         pass
                 if "enabled" in ruleset_data:
@@ -244,9 +286,14 @@ class IAMDatabase:
                 ruleset_data["rules"] = json.loads(ruleset_data["rules"])
             except:
                 pass
+        if "blocked_keywords" in ruleset_data:
+            try:
+                ruleset_data["blocked_keywords"] = json.loads(ruleset_data["blocked_keywords"])
+            except:
+                pass
         if "enabled" in ruleset_data:
             ruleset_data["enabled"] = ruleset_data["enabled"].lower() == "true"
-        
+
         return ruleset_data
     
     def create_ruleset(self, data: Dict) -> bool:
@@ -260,9 +307,11 @@ class IAMDatabase:
         # Convert complex types to JSON strings
         if "rules" in data and isinstance(data["rules"], dict):
             data["rules"] = json.dumps(data["rules"])
+        if "blocked_keywords" in data and isinstance(data["blocked_keywords"], list):
+            data["blocked_keywords"] = json.dumps(data["blocked_keywords"])
         if "enabled" in data:
             data["enabled"] = str(data["enabled"]).lower()
-        
+
         self.redis_client.hset(f"rulesets:{ruleset_id}", mapping=data)
         self.redis_client.sadd("rulesets:all", ruleset_id)
         return True
@@ -277,9 +326,11 @@ class IAMDatabase:
         # Convert complex types to JSON strings
         if "rules" in data and isinstance(data["rules"], dict):
             data["rules"] = json.dumps(data["rules"])
+        if "blocked_keywords" in data and isinstance(data["blocked_keywords"], list):
+            data["blocked_keywords"] = json.dumps(data["blocked_keywords"])
         if "enabled" in data:
             data["enabled"] = str(data["enabled"]).lower()
-        
+
         self.redis_client.hset(f"rulesets:{ruleset_id}", mapping=data)
         return True
     
@@ -398,19 +449,118 @@ class IAMDatabase:
         policy_id = data.get("policy_id")
         if not policy_id:
             return False
-        
+
         data["created_at"] = datetime.now().isoformat()
-        
+
         # Convert complex types to JSON strings
         for field in ["prompt_validation_rulesets", "tool_validation_rulesets", "response_filtering_rulesets"]:
             if field in data and isinstance(data[field], list):
                 data[field] = json.dumps(data[field])
         if "enabled" in data:
             data["enabled"] = str(data["enabled"]).lower()
-        
+
         self.redis_client.hset(f"policies:{policy_id}", mapping=data)
         self.redis_client.sadd("policies:all", policy_id)
         return True
+
+    def assign_rulesets_to_agent(self, agent_id: str, assignments: Dict[str, List[str]], enabled: Optional[bool] = None) -> bool:
+        """Assign a set of rulesets to the agent's policy."""
+        agent = self.get_agent(agent_id)
+        if not agent:
+            return False
+
+        policy = self.get_policy_by_agent(agent_id)
+        if not policy:
+            policy_id = f"policy_{agent_id}"
+            self.create_policy({
+                "policy_id": policy_id,
+                "agent_id": agent_id,
+                "name": f"{agent.get('name', agent_id)} Policy",
+                "prompt_validation_rulesets": assignments.get("prompt_validation_rulesets", []),
+                "tool_validation_rulesets": assignments.get("tool_validation_rulesets", []),
+                "response_filtering_rulesets": assignments.get("response_filtering_rulesets", []),
+                "enabled": enabled if enabled is not None else True
+            })
+            return True
+
+        policy_id = policy.get("policy_id")
+        update_payload: Dict[str, Any] = {
+            "prompt_validation_rulesets": assignments.get("prompt_validation_rulesets", []),
+            "tool_validation_rulesets": assignments.get("tool_validation_rulesets", []),
+            "response_filtering_rulesets": assignments.get("response_filtering_rulesets", [])
+        }
+
+        if enabled is not None:
+            update_payload["enabled"] = enabled
+
+        return self.update_policy(policy_id, update_payload)
+
+    def get_agent_flow(self, limit: int = 200) -> Dict[str, Any]:
+        """Build agent flow information from recent logs"""
+        logs = self.get_logs(limit=limit)
+        agents = {agent["agent_id"]: agent for agent in self.get_all_agents()}
+
+        node_metrics: Dict[str, Dict[str, Any]] = {}
+        edge_map: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
+        for log in logs:
+            source = log.get("agent_id") or log.get("source_agent") or "unknown"
+            target = (
+                log.get("target_agent")
+                or log.get("destination_agent")
+                or log.get("target")
+                or "external"
+            )
+
+            verdict = (log.get("verdict") or "").upper()
+
+            if source not in node_metrics:
+                node_metrics[source] = {"events": 0, "violations": 0}
+            node_metrics[source]["events"] += 1
+            if verdict in {"VIOLATION", "BLOCKED"}:
+                node_metrics[source]["violations"] += 1
+
+            key = (source, target)
+            if key not in edge_map:
+                edge_map[key] = {"source": source, "target": target, "count": 0, "violations": 0}
+            edge_map[key]["count"] += 1
+            if verdict in {"VIOLATION", "BLOCKED"}:
+                edge_map[key]["violations"] += 1
+
+        nodes = []
+        seen = set()
+        for agent_id, agent in agents.items():
+            metrics = node_metrics.get(agent_id, {"events": 0, "violations": 0})
+            nodes.append({
+                "id": agent_id,
+                "name": agent.get("name", agent_id),
+                "status": agent.get("status", "unknown"),
+                "plugins": agent.get("plugins", []),
+                "metrics": metrics
+            })
+            seen.add(agent_id)
+
+        for node_id, metrics in node_metrics.items():
+            if node_id not in seen:
+                nodes.append({
+                    "id": node_id,
+                    "name": node_id.replace("_", " ").title(),
+                    "status": "external" if node_id == "external" else "unknown",
+                    "plugins": [],
+                    "metrics": metrics
+                })
+
+        edges = list(edge_map.values())
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "meta": {
+                "window": limit,
+                "generated_at": datetime.utcnow().isoformat() + "Z",
+                "total_events": len(logs)
+            }
+        }
     
     # ========== Log Operations ==========
     def add_log(self, log_data: Dict) -> bool:

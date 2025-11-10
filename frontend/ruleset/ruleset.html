@@ -3,33 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>A2A Security Dashboard - Ruleset</title>
-
+    <title>A2A Security Dashboard - Rulesets</title>
+    <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="style.css" />
     <script src="ruleset.js" defer></script>
   </head>
   <body>
-    <div class="app-container">
+    <div class="app-container" data-page="ruleset">
       <header class="app-header">
         <div class="logo">A2A SECURE</div>
-
         <nav class="main-nav">
           <a href="../dashboard.html" class="nav-link">Dashboard</a>
           <a href="../agents/agents.html" class="nav-link">Agents</a>
           <a href="../logs/logs.html" class="nav-link">Logs</a>
-          <a href="Ruleset.html" class="nav-link active">Ruleset</a>
+          <a href="ruleset.html" class="nav-link active">Ruleset</a>
         </nav>
       </header>
 
       <main class="content-area">
         <section id="ruleset" class="content-page active">
-          <div class="widget widget-ruleset-list">
+          <article class="widget ruleset-widget">
             <div class="widget-header-with-button">
-              <h3 class="widget-title">Ruleset List</h3>
+              <h3 class="widget-title">Ruleset catalog</h3>
               <div class="widget-actions">
-                <button class="btn-primary" id="openModalBtn">
-                  Add New Rule
-                </button>
+                <button class="btn-primary" id="open-create-ruleset">New ruleset</button>
               </div>
             </div>
 
@@ -37,26 +34,140 @@
               <table class="ruleset-table">
                 <thead>
                   <tr>
-                    <th>Ruleset ID</th>
+                    <th>ID</th>
                     <th>Name</th>
                     <th>Type</th>
                     <th>Status</th>
-                    <th>Actions</th>
+                    <th>Updated</th>
+                    <th></th>
                   </tr>
                 </thead>
-                <tbody>
-                  <!-- Rulesets will be loaded dynamically -->
+                <tbody id="ruleset-table-body">
                   <tr>
-                    <td colspan="5" style="text-align: center; color: var(--text-secondary); padding: 20px;">
-                      Loading rulesets...
-                    </td>
+                    <td colspan="6" class="empty-state">Loading rulesets…</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-          </div>
+          </article>
         </section>
       </main>
     </div>
+
+    <template id="ruleset-row-template">
+      <tr>
+        <td class="ruleset-id"></td>
+        <td class="ruleset-name"></td>
+        <td class="ruleset-type"></td>
+        <td class="ruleset-status"></td>
+        <td class="ruleset-updated"></td>
+        <td class="ruleset-actions">
+          <button class="btn-secondary btn-small" data-action="view">View</button>
+          <button class="btn-secondary btn-small" data-action="edit">Edit</button>
+          <button class="btn-danger btn-small" data-action="delete">Delete</button>
+        </td>
+      </tr>
+    </template>
+
+    <div class="modal-overlay hidden" id="ruleset-modal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="ruleset-modal-title">
+        <div class="modal-header">
+          <h3 id="ruleset-modal-title">Ruleset</h3>
+          <button class="btn-secondary" id="close-ruleset-modal">Close</button>
+        </div>
+        <div class="modal-content" id="ruleset-modal-body"></div>
+      </div>
+    </div>
+
+    <template id="ruleset-form-template">
+      <form id="ruleset-form" class="ruleset-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="ruleset-id">Ruleset ID</label>
+            <input type="text" id="ruleset-id" name="ruleset_id" required placeholder="ruleset_example" />
+          </div>
+
+          <div class="form-group">
+            <label for="ruleset-name">Display name</label>
+            <input type="text" id="ruleset-name" name="name" required />
+          </div>
+
+          <div class="form-group">
+            <label for="ruleset-type">Ruleset type</label>
+            <select id="ruleset-type" name="type" required>
+              <option value="prompt_validation">Prompt validation</option>
+              <option value="tool_validation">Tool validation</option>
+              <option value="response_filtering">Response filtering</option>
+            </select>
+          </div>
+
+          <div class="form-group checkbox">
+            <label for="ruleset-enabled">
+              <input type="checkbox" id="ruleset-enabled" name="enabled" checked />
+              Enabled
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="ruleset-description">Description</label>
+          <textarea id="ruleset-description" name="description" placeholder="Describe the enforcement logic"></textarea>
+        </div>
+
+        <div class="form-group" data-field="prompt_validation">
+          <label for="ruleset-system-prompt">System prompt</label>
+          <textarea id="ruleset-system-prompt" name="system_prompt" placeholder="System prompt"></textarea>
+        </div>
+
+        <div class="form-group" data-field="prompt_validation">
+          <label for="ruleset-model">Model (optional)</label>
+          <input type="text" id="ruleset-model" name="model" placeholder="gemini-2.0-flash-exp" />
+        </div>
+
+        <div class="form-group" data-field="tool_validation">
+          <label for="ruleset-tool-name">Tool name</label>
+          <input type="text" id="ruleset-tool-name" name="tool_name" placeholder="call_remote_agent" />
+        </div>
+
+        <div class="form-group" data-field="tool_validation">
+          <label for="ruleset-rules">Validation rules (JSON)</label>
+          <textarea id="ruleset-rules" name="rules" placeholder='{"allowed_agents": []}'></textarea>
+        </div>
+
+        <div class="form-group" data-field="response_filtering">
+          <label for="ruleset-blocked">Blocked keywords (JSON array)</label>
+          <textarea id="ruleset-blocked" name="blocked_keywords" placeholder='["secret", "credential"]'></textarea>
+        </div>
+
+        <div class="form-actions">
+          <span class="status-message" id="ruleset-form-status"></span>
+          <button type="submit" class="btn-primary">Save ruleset</button>
+        </div>
+      </form>
+    </template>
+
+    <template id="ruleset-detail-template">
+      <div class="ruleset-detail">
+        <div class="detail-grid">
+          <div>
+            <h4>Metadata</h4>
+            <ul>
+              <li><strong>Ruleset ID:</strong> <span data-field="ruleset_id"></span></li>
+              <li><strong>Type:</strong> <span data-field="type"></span></li>
+              <li><strong>Status:</strong> <span data-field="status"></span></li>
+              <li><strong>Updated:</strong> <span data-field="updated"></span></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Description</h4>
+            <p data-field="description"></p>
+          </div>
+        </div>
+        <div class="detail-json">
+          <h4>Configuration</h4>
+          <pre data-field="json"></pre>
+        </div>
+      </div>
+    </template>
   </body>
 </html>

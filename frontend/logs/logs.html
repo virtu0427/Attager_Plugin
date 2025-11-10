@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A2A Security Dashboard - Logs</title>
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/minisearch@6.1.0/dist/umd/index.min.js" defer></script>
+    <script src="logs.js" defer></script>
+  </head>
+  <body>
+    <div class="app-container" data-page="logs">
+      <header class="app-header">
+        <div class="logo">A2A SECURE</div>
+        <nav class="main-nav">
+          <a href="../dashboard.html" class="nav-link">Dashboard</a>
+          <a href="../agents/agents.html" class="nav-link">Agents</a>
+          <a href="logs.html" class="nav-link active">Logs</a>
+          <a href="../ruleset/ruleset.html" class="nav-link">Ruleset</a>
+        </nav>
+      </header>
+
+      <main class="content-area">
+        <section id="logs" class="content-page active">
+          <div class="logs-grid">
+            <article class="widget">
+              <div class="widget-header-with-button">
+                <h3 class="widget-title">Search &amp; Filter</h3>
+                <div class="widget-actions">
+                  <button class="btn-secondary" id="refresh-logs">Refresh</button>
+                </div>
+              </div>
+
+              <div class="filters">
+                <div class="form-group">
+                  <label for="log-search">Full-text search</label>
+                  <input
+                    type="search"
+                    id="log-search"
+                    placeholder="Search by message, agent, policy or plugin"
+                    autocomplete="off"
+                  />
+                </div>
+
+                <div class="filter-row">
+                  <div class="form-group">
+                    <label for="filter-agent">Agent</label>
+                    <select id="filter-agent">
+                      <option value="all">All agents</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="filter-verdict">Verdict</label>
+                    <select id="filter-verdict">
+                      <option value="all">Any verdict</option>
+                      <option value="pass">Pass</option>
+                      <option value="violation">Violation</option>
+                      <option value="blocked">Blocked</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="filter-timeframe">Time window</label>
+                    <select id="filter-timeframe">
+                      <option value="all">All</option>
+                      <option value="15m">Last 15 minutes</option>
+                      <option value="1h">Last hour</option>
+                      <option value="24h">Last 24 hours</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="widget logs-results">
+              <div class="widget-header-with-button">
+                <h3 class="widget-title">Log Explorer</h3>
+                <div class="widget-actions">
+                  <span class="pill" id="log-count">0 results</span>
+                </div>
+              </div>
+
+              <div class="log-table-wrapper">
+                <table class="log-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Timestamp</th>
+                      <th scope="col">Agent</th>
+                      <th scope="col">Verdict</th>
+                      <th scope="col">Context</th>
+                      <th scope="col">Message</th>
+                      <th scope="col"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="logs-table-body">
+                    <tr>
+                      <td colspan="6" class="empty-state">Loading logs…</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="log-row-template">
+      <tr>
+        <td class="log-time"></td>
+        <td class="log-agent"></td>
+        <td class="log-verdict"></td>
+        <td class="log-context"></td>
+        <td class="log-message"></td>
+        <td class="log-actions">
+          <button class="btn-secondary btn-small">Inspect</button>
+        </td>
+      </tr>
+    </template>
+
+    <div class="modal-overlay hidden" id="log-modal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="log-modal-title">
+        <div class="modal-header">
+          <h3 id="log-modal-title">Log detail</h3>
+          <button class="btn-secondary" id="close-log-modal">Close</button>
+        </div>
+        <div class="modal-content">
+          <pre id="log-modal-content"></pre>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
