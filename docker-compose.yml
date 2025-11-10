@@ -124,6 +124,7 @@ services:
       - agent-network
     volumes:
       - ./frontend:/app
+      - ./iam:/app/iam:ro
 
   # Delivery Agent
   delivery-agent:

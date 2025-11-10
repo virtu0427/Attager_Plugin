@@ -146,6 +146,8 @@ python Orchestrator_plugin/server_redis.py
 - **환경별 의존성 분리**: 실행 환경 스크립트(`agents/*`, `Orchestrator_new/`)는 에이전트 로직에 집중하고, 보안 로직은 `iam/`을 통해 주입합니다. 환경 설정 변경 시 보안 로직을 직접 수정하지 말고 환경 변수(`POLICY_SERVER_URL`, `LOG_SERVER_URL`, `GOOGLE_API_KEY`)만 조정해야 합니다.
 - **IAM 룰 검증 절차**: 정책 서버(`Orchestrator_plugin/server_redis.py`)는 Redis에 저장된 룰셋을 그대로 반환합니다. 새로운 룰을 추가하거나 정책을 변경한 뒤에는 `iam.policy_enforcement.PolicyEnforcementPlugin.fetch_policy()`를 호출하거나 서비스 재기동으로 정책을 갱신하고, `/api/iam/policy/{agent_id}` 응답 구조(`prompt_validation_rules`, `tool_validation_rules`)가 플러그인에서 기대하는 스키마와 일치하는지 확인하세요.
 - **로그 수집 확인**: 플러그인은 정책 위반 시 `/api/logs` 엔드포인트로 감사 로그를 전송합니다. 로그 저장소가 분리된 환경에서는 해당 엔드포인트를 프록시하거나 IAM Redis에 쓰기 권한을 가진 API 게이트웨이를 구성해야 합니다.
+- **Docker 개발 모드 주의**: `frontend` 서비스는 소스 볼륨(`./frontend:/app`)을 마운트하므로, 분리된 `iam/` 패키지가 `/app/iam`에 추가로 마운트되도록 `docker-compose.yml`에 `./iam:/app/iam:ro`가 선언되어 있습니다. 커스텀 Compose 파일을 작성할 때도 동일한 마운트를 포함해야 `import iam` 오류가 발생하지 않습니다.
+- **공유 패키지 의존성**: 모든 에이전트와 정책 서버 Dockerfile이 루트 `requirements.txt`를 설치하고 `iam/` 디렉터리를 이미지에 복사하도록 갱신되었습니다. 신규 이미지를 작성할 때도 동일한 패턴을 따라야 `PolicyEnforcementPlugin`과 Redis 래퍼가 동작합니다.
 
 ---
 이 문서는 새로운 에이전트나 개발자가 빠르게 환경을 이해하고 기동할 수 있도록 현재 구성과 절차를 요약합니다. 추가 질문이나 업데이트는 `ARCHITECTURE.md`, `DOCKER_GUIDE.md`, `README.md`를 참고하거나 최신 변경 사항 커밋 메시지를 확인하세요.

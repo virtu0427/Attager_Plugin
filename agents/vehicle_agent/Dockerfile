@@ -18,8 +18,9 @@ COPY requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy utils first
+# Copy utils and shared IAM package
 COPY utils/ ./utils/
+COPY iam ./iam
 
 # Copy agent files
 COPY agents/vehicle_agent/ .
