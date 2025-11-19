@@ -38,37 +38,28 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.login-shell {
-  width: min(960px, 100%);
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 32px;
-}
-
-.login-copy {
-  text-align: center;
-  padding: 0 12px;
-}
-
-.login-copy h1 {
-  margin: 12px 0 8px;
-  font-size: clamp(32px, 4vw, 44px);
+  padding: 20px;
 }
 
 .login-panel {
+  width: min(520px, 100%);
   background: var(--panel);
   border-radius: 18px;
-  padding: 26px;
+  padding: 32px;
   box-shadow: var(--shadow);
   border: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  position: relative;
-  z-index: 1;
+  gap: 20px;
+}
+
+.login-hero {
+  text-align: center;
+}
+
+.login-hero h1 {
+  margin: 12px 0 6px;
+  font-size: clamp(30px, 5vw, 42px);
 }
 
 .login-panel-text {
@@ -84,18 +75,6 @@ body {
 .login-panel-text p {
   margin: 0;
   color: var(--muted);
-}
-
-@media (min-width: 960px) {
-  .login-shell {
-    grid-template-columns: 1.1fr 0.9fr;
-    align-items: center;
-  }
-
-  .login-copy {
-    text-align: left;
-    padding-right: 28px;
-  }
 }
 
 header {
