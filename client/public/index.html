@@ -15,14 +15,47 @@
           오케스트레이터 에이전트와 직접 대화하고 워크플로우를 시험해 보세요.
         </p>
       </div>
-      <div class="status-card">
-        <div class="label">RPC 엔드포인트</div>
-        <div class="value" id="endpoint">/</div>
-        <p class="hint">
-          <strong>ORCHESTRATOR_RPC_URL</strong> 환경 변수로 엔드포인트를 변경할 수 있습니다.
-        </p>
+      <div class="header-cards">
+        <div class="status-card">
+          <div class="label">RPC 엔드포인트</div>
+          <div class="value" id="endpoint">/</div>
+          <p class="hint">
+            <strong>ORCHESTRATOR_RPC_URL</strong> 환경 변수로 엔드포인트를 변경할 수 있습니다.
+          </p>
+        </div>
+        <div class="status-card user-card" id="user-card">
+          <div class="label">접속 사용자</div>
+          <div class="value" id="user-email">로그인 필요</div>
+          <p class="hint" id="user-tenant">JWT 인증을 완료해 주세요.</p>
+        </div>
       </div>
     </header>
+
+    <section class="login-panel" id="login-panel">
+      <div>
+        <h2>JWT 로그인</h2>
+        <p>JWT 서버에서 토큰을 발급받아야 채팅을 시작할 수 있습니다.</p>
+      </div>
+      <form id="login-form" class="login-form" autocomplete="off">
+        <label class="sr-only" for="email">이메일</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          placeholder="user@example.com"
+          required
+        />
+        <label class="sr-only" for="password">비밀번호</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          placeholder="비밀번호"
+          required
+        />
+        <button type="submit" id="login-btn">로그인</button>
+      </form>
+    </section>
 
     <main>
       <section class="chat-panel">
@@ -33,10 +66,11 @@
             id="message"
             name="message"
             type="text"
-            placeholder="에이전트에게 요청을 입력하세요..."
+            placeholder="로그인 후 에이전트에게 요청을 입력하세요..."
             required
+            disabled
           />
-          <button type="submit" id="send-btn">전송</button>
+          <button type="submit" id="send-btn" disabled>전송</button>
         </form>
       </section>
       <aside class="tips">
