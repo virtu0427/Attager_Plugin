@@ -1,207 +1,194 @@
-const page = document.body.dataset.page || "login";
+const chatLog = document.getElementById("chat-log");
+const chatForm = document.getElementById("chat-form");
+const messageInput = document.getElementById("message");
+const sendButton = document.getElementById("send-btn");
+const endpointLabel = document.getElementById("endpoint");
 const toast = document.getElementById("toast");
+const loginForm = document.getElementById("login-form");
+const loginButton = document.getElementById("login-btn");
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const userCard = document.getElementById("user-card");
+const userEmail = document.getElementById("user-email");
+const userTenant = document.getElementById("user-tenant");
+const loginScreen = document.getElementById("login-screen");
+const chatScreen = document.getElementById("chat-screen");
+
+let authToken = null;
+let currentUser = null;
 
 function showToast(text, isError = false) {
-  if (!toast) return;
   toast.textContent = text;
   toast.classList.toggle("error", isError);
   toast.classList.add("show");
   setTimeout(() => toast.classList.remove("show"), 2400);
 }
 
-function initLoginPage() {
-  const loginForm = document.getElementById("login-form");
-  const emailInput = document.getElementById("email");
-  const passwordInput = document.getElementById("password");
-  const loginButton = document.getElementById("login-btn");
-
-  if (!loginForm || !emailInput || !passwordInput || !loginButton) {
+function setChatEnabled(enabled) {
+  if (!messageInput || !sendButton) {
     return;
   }
-
-  loginForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const email = emailInput.value.trim();
-    const password = passwordInput.value;
-    if (!email || !password) {
-      showToast("이메일과 비밀번호를 입력해 주세요.", true);
-      return;
-    }
-
-    loginButton.disabled = true;
-    loginButton.textContent = "로그인 중...";
-
-    try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        const detail = data?.detail || "로그인에 실패했습니다.";
-        const message = typeof detail === "string" ? detail : "로그인에 실패했습니다.";
-        showToast(message, true);
-        return;
-      }
-
-      showToast("로그인에 성공했습니다.");
-      window.location.href = "/chat";
-    } catch (error) {
-      showToast(`로그인 실패: ${error.message}`, true);
-    } finally {
-      loginButton.disabled = false;
-      loginButton.textContent = "로그인";
-      passwordInput.value = "";
-    }
-  });
+  messageInput.disabled = !enabled;
+  sendButton.disabled = !enabled;
+  messageInput.placeholder = enabled
+    ? "에이전트에게 요청을 입력하세요..."
+    : "로그인 후 에이전트에게 요청을 입력하세요...";
 }
 
-function initChatPage() {
-  const chatLog = document.getElementById("chat-log");
-  const chatForm = document.getElementById("chat-form");
-  const messageInput = document.getElementById("message");
-  const sendButton = document.getElementById("send-btn");
-  const userCard = document.getElementById("user-card");
-  const userEmail = document.getElementById("user-email");
-  const userTenant = document.getElementById("user-tenant");
-  const logoutButton = document.getElementById("logout-btn");
-  const endpointLabel = document.getElementById("endpoint");
-
-  if (!chatLog || !chatForm || !messageInput || !sendButton) {
+function updateUserCard(user) {
+  if (!userCard || !userEmail || !userTenant) {
+    return;
+  }
+  if (!user) {
+    userCard.classList.add("inactive");
+    userEmail.textContent = "로그인 필요";
+    userTenant.textContent = "JWT 인증을 완료해 주세요.";
     return;
   }
 
-  function addMessage(role, text) {
-    const div = document.createElement("div");
-    div.className = `message ${role}`;
-    div.textContent = text;
-    chatLog.appendChild(div);
-    chatLog.scrollTop = chatLog.scrollHeight;
+  const tenants = Array.isArray(user.tenants) && user.tenants.length > 0
+    ? user.tenants.join(", ")
+    : "연결된 테넌트 없음";
+  userCard.classList.remove("inactive");
+  userEmail.textContent = user.email;
+  userTenant.textContent = tenants;
+}
+
+function setScreenState(isAuthenticated) {
+  if (loginScreen) {
+    loginScreen.classList.toggle("active", !isAuthenticated);
+  }
+  if (chatScreen) {
+    chatScreen.classList.toggle("active", isAuthenticated);
+  }
+}
+
+function resetAuthState(showMessage = false) {
+  authToken = null;
+  currentUser = null;
+  updateUserCard(null);
+  setChatEnabled(false);
+  setScreenState(false);
+  if (showMessage) {
+    addMessage("system", "세션이 만료되었습니다. 다시 로그인해 주세요.");
+    showToast("세션이 만료되었습니다.", true);
+  }
+}
+
+function addMessage(role, text) {
+  const div = document.createElement("div");
+  div.className = `message ${role}`;
+  div.textContent = text;
+  chatLog.appendChild(div);
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+async function sendMessage(event) {
+  event.preventDefault();
+  const text = messageInput.value.trim();
+  if (!text) return;
+  if (!authToken) {
+    showToast("로그인 후 이용해 주세요.", true);
+    return;
   }
 
-  function setChatEnabled(enabled) {
-    messageInput.disabled = !enabled;
-    sendButton.disabled = !enabled;
-    messageInput.placeholder = enabled
-      ? "에이전트에게 요청을 입력하세요..."
-      : "세션 확인 중...";
-  }
+  addMessage("user", text);
+  messageInput.value = "";
+  messageInput.focus();
 
-  function updateUserCard(user) {
-    if (!userCard || !userEmail || !userTenant) {
-      return;
-    }
-    if (!user) {
-      userCard.classList.add("inactive");
-      userEmail.textContent = "세션 없음";
-      userTenant.textContent = "로그인 후 이용해 주세요.";
-      return;
-    }
+  sendButton.disabled = true;
+  sendButton.textContent = "전송 중...";
 
-    const tenants = Array.isArray(user.tenants) && user.tenants.length > 0
-      ? user.tenants.join(", ")
-      : "연결된 테넌트 없음";
-    userCard.classList.remove("inactive");
-    userEmail.textContent = user.email;
-    userTenant.textContent = tenants;
-  }
-
-  async function fetchEndpointInfo() {
-    if (!endpointLabel) return;
-    try {
-      const response = await fetch("/api/meta");
-      const data = await response.json();
-      endpointLabel.textContent = data.orchestrator_url || window.location.origin;
-    } catch (error) {
-      endpointLabel.textContent = "알 수 없음";
-    }
-  }
-
-  async function bootstrapSession() {
-    try {
-      const response = await fetch("/api/session", { credentials: "same-origin" });
-      if (response.status === 401) {
-        window.location.href = "/login";
-        return null;
-      }
-      const data = await response.json();
-      if (!response.ok) {
-        showToast("세션을 확인하지 못했습니다.", true);
-        window.location.href = "/login";
-        return null;
-      }
-
-      updateUserCard(data.user);
-      setChatEnabled(true);
-      addMessage("system", `${data.user.email}님 환영합니다.`);
-      return data;
-    } catch (error) {
-      showToast("세션 확인 실패", true);
-      window.location.href = "/login";
-      return null;
-    }
-  }
-
-  async function sendMessage(event) {
-    event.preventDefault();
-    const text = messageInput.value.trim();
-    if (!text) return;
-
-    addMessage("user", text);
-    messageInput.value = "";
-    messageInput.focus();
-
-    sendButton.disabled = true;
-    sendButton.textContent = "전송 중...";
-
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ message: text }),
-      });
-      const data = await response.json();
-      if (response.status === 401) {
-        showToast("세션이 만료되었습니다.", true);
-        window.location.href = "/login";
-        return;
-      }
-      if (!response.ok) {
-        const detail = data?.detail || "오류가 발생했습니다.";
-        addMessage("system", typeof detail === "string" ? detail : "오류가 발생했습니다.");
-        showToast("요청 실패", true);
-        return;
-      }
-      addMessage("agent", data.reply || "응답 없음");
-    } catch (error) {
-      addMessage("system", `요청 실패: ${error.message}`);
-      showToast(error.message, true);
-    } finally {
-      sendButton.disabled = false;
-      sendButton.textContent = "전송";
-    }
-  }
-
-  if (logoutButton) {
-    logoutButton.addEventListener("click", async () => {
-      try {
-        await fetch("/api/logout", { method: "POST", credentials: "same-origin" });
-      } finally {
-        window.location.href = "/login";
-      }
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({ message: text }),
     });
+
+    const data = await response.json();
+    if (response.status === 401) {
+      resetAuthState(true);
+      return;
+    }
+    if (!response.ok) {
+      const detail = data?.detail || "오류가 발생했습니다.";
+      addMessage("system", detail);
+      showToast(detail, true);
+      return;
+    }
+
+    addMessage("agent", data.reply || "응답 없음");
+  } catch (error) {
+    addMessage("system", `요청 실패: ${error.message}`);
+    showToast(error.message, true);
+  } finally {
+    sendButton.disabled = false;
+    sendButton.textContent = "전송";
+  }
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
+  if (!email || !password) {
+    return;
   }
 
-  chatForm.addEventListener("submit", sendMessage);
-  fetchEndpointInfo();
-  bootstrapSession();
+  loginButton.disabled = true;
+  loginButton.textContent = "로그인 중...";
+
+  try {
+    const response = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      const detail = data?.detail || "로그인에 실패했습니다.";
+      showToast(typeof detail === "string" ? detail : "로그인에 실패했습니다.", true);
+      return;
+    }
+
+    authToken = data.access_token;
+    currentUser = data.user;
+    updateUserCard(currentUser);
+    setScreenState(true);
+    setChatEnabled(true);
+    addMessage("system", `${currentUser.email}님 로그인되었습니다.`);
+    showToast("로그인에 성공했습니다.");
+  } catch (error) {
+    showToast(`로그인 실패: ${error.message}`, true);
+  } finally {
+    loginButton.disabled = false;
+    loginButton.textContent = "로그인";
+    passwordInput.value = "";
+  }
 }
 
-if (page === "login") {
-  initLoginPage();
-} else if (page === "chat") {
-  initChatPage();
+function fetchEndpointInfo() {
+  fetch("/api/meta")
+    .then((res) => res.json())
+    .then((data) => {
+      endpointLabel.textContent = data.orchestrator_url || window.location.origin;
+    })
+    .catch(() => {
+      endpointLabel.textContent = "알 수 없음";
+    });
 }
+
+resetAuthState();
+addMessage("system", "JWT 서버 로그인 후 채팅을 시작할 수 있습니다.");
+
+if (chatForm) {
+  chatForm.addEventListener("submit", sendMessage);
+}
+if (loginForm) {
+  loginForm.addEventListener("submit", handleLogin);
+}
+fetchEndpointInfo();
