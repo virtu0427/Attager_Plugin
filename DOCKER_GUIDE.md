@@ -10,11 +10,13 @@
 - **IAM Policy Server** (포트 8005): 정책/로그 서버
 - **IAM Frontend** (포트 8006): IAM 관리 UI
 - **Orchestrator Plugin Agent** (포트 10000): 메인 오케스트레이터, 다른 에이전트를 조율 (Docker Compose에서 기본 포함)
-- **Orchestrator Client UI** (포트 8010): 오케스트레이터 플러그인과 대화하는 독립 UI
+- **Orchestrator Client UI** (포트 8010): 오케스트레이터 플러그인과 대화하는 독립 UI (게이트웨이: `http://localhost:8010/login`)
 - **Delivery Agent** (포트 10001): 배송 데이터 관리
 - **Item Agent** (포트 10002): 아이템 데이터 관리
 - **Quality Agent** (포트 10003): 품질 데이터 관리
 - **Vehicle Agent** (포트 10004): 차량 데이터 관리
+- **JWT Auth Server** (포트 8011): JWT 발급/검증용 인증 서버
+- **JWS Signing Server** (포트 8012): 에이전트 카드 서명/검증용 서버
 
 ## 실행 방법
 
