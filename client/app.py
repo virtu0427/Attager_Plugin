@@ -1,10 +1,12 @@
 import asyncio
+import contextlib
 import os
 import uuid
 from pathlib import Path
+from typing import List
 
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +17,7 @@ PUBLIC_DIR = BASE_DIR / "public"
 STATIC_DIR = BASE_DIR / "static"
 
 ORCHESTRATOR_RPC_URL = os.getenv("ORCHESTRATOR_RPC_URL", "http://localhost:10000/").rstrip("/") + "/"
+JWT_SERVER_URL = os.getenv("JWT_SERVER_URL", "http://localhost:8011").rstrip("/")
 
 app = FastAPI(title="Orchestrator Chat Client")
 app.add_middleware(
@@ -39,6 +42,22 @@ class ChatResponse(BaseModel):
 
 class MetaResponse(BaseModel):
     orchestrator_url: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserProfile(BaseModel):
+    email: str
+    tenants: List[str]
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserProfile
 
 
 @app.get("/", response_class=FileResponse)
@@ -108,6 +127,77 @@ def _extract_reply_from_result(result_obj: dict) -> str:
     return ""
 
 
+def _normalize_tenants(candidate: object) -> List[str]:
+    if isinstance(candidate, str):
+        return [candidate]
+    if isinstance(candidate, list):
+        return [str(item) for item in candidate if isinstance(item, (str, int, float))]
+    return []
+
+
+def _request_jwt_token(email: str, password: str) -> dict:
+    try:
+        response = requests.post(
+            f"{JWT_SERVER_URL}/token",
+            data={"username": email, "password": password},
+            timeout=10,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"JWT 서버 요청 실패: {exc}") from exc
+
+    if response.status_code >= 400:
+        detail = response.text
+        with contextlib.suppress(ValueError):
+            detail = response.json()
+        raise HTTPException(status_code=response.status_code, detail=detail)
+
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="JWT 서버 응답이 JSON이 아닙니다") from exc
+
+
+def _request_jwt_profile(token: str) -> dict:
+    headers = {"Authorization": f"Bearer {token}"}
+    try:
+        response = requests.get(
+            f"{JWT_SERVER_URL}/users/me",
+            headers=headers,
+            timeout=10,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail=f"JWT 서버 요청 실패: {exc}") from exc
+
+    if response.status_code >= 400:
+        detail = response.text
+        with contextlib.suppress(ValueError):
+            detail = response.json()
+        raise HTTPException(status_code=response.status_code, detail=detail)
+
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="JWT 서버 응답이 JSON이 아닙니다") from exc
+
+
+@app.post("/api/login", response_model=LoginResponse)
+def login(body: LoginRequest) -> LoginResponse:
+    token_payload = _request_jwt_token(body.email, body.password)
+    access_token = token_payload.get("access_token")
+    token_type = token_payload.get("token_type", "bearer")
+    if not access_token:
+        raise HTTPException(status_code=502, detail="JWT 토큰을 발급받지 못했습니다")
+
+    user_payload = _request_jwt_profile(access_token)
+    email = user_payload.get("email")
+    tenants = _normalize_tenants(user_payload.get("tenant"))
+    if not email:
+        raise HTTPException(status_code=502, detail="JWT 서버가 사용자 정보를 반환하지 않았습니다")
+
+    user_profile = UserProfile(email=email, tenants=tenants)
+    return LoginResponse(access_token=access_token, token_type=token_type, user=user_profile)
+
+
 async def _send_rpc(payload: dict) -> dict:
     try:
         response = await asyncio.to_thread(
@@ -135,8 +225,20 @@ async def _send_rpc(payload: dict) -> dict:
         raise HTTPException(status_code=502, detail="오케스트레이터 응답이 JSON이 아닙니다") from exc
 
 
+def _extract_token(authorization: str | None) -> str:
+    if not authorization:
+        return ""
+    if authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return authorization.strip()
+
+
 @app.post("/api/chat", response_model=ChatResponse)
-async def send_message(body: ChatRequest) -> ChatResponse:
+async def send_message(body: ChatRequest, authorization: str | None = Header(default=None)) -> ChatResponse:
+    token = _extract_token(authorization)
+    if not token:
+        raise HTTPException(status_code=401, detail="로그인 후 이용해 주세요.")
+
     user_message = body.message.strip()
     if not user_message:
         raise HTTPException(status_code=400, detail="메시지를 입력해 주세요.")

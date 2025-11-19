@@ -251,8 +251,11 @@ services:
     container_name: orchestrator-client
     environment:
       - ORCHESTRATOR_RPC_URL=http://orchestrator:10000/
+      - JWT_SERVER_URL=http://jwt-server:8011
     depends_on:
       orchestrator:
+        condition: service_started
+      jwt-server:
         condition: service_started
     ports:
       - "8010:8010"
