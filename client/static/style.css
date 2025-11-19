@@ -34,22 +34,28 @@ body {
 }
 
 #login-screen {
-  max-width: 720px;
-  margin: 0 auto;
   min-height: calc(100vh - 160px);
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 28px;
 }
 
-.login-hero {
+.login-shell {
+  width: min(960px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+}
+
+.login-copy {
   text-align: center;
+  padding: 0 12px;
 }
 
-.login-hero h1 {
+.login-copy h1 {
   margin: 12px 0 8px;
-  font-size: 38px;
+  font-size: clamp(32px, 4vw, 44px);
 }
 
 .login-panel {
@@ -61,6 +67,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  position: relative;
+  z-index: 1;
 }
 
 .login-panel-text {
@@ -76,6 +84,18 @@ body {
 .login-panel-text p {
   margin: 0;
   color: var(--muted);
+}
+
+@media (min-width: 960px) {
+  .login-shell {
+    grid-template-columns: 1.1fr 0.9fr;
+    align-items: center;
+  }
+
+  .login-copy {
+    text-align: left;
+    padding-right: 28px;
+  }
 }
 
 header {
