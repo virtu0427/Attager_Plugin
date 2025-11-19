@@ -1,0 +1,78 @@
+{
+"name": "CustomerAgent",
+"description": "customer_agent.description",
+"protocolVersion": "1.0",
+"url": "http://localhost:10006",
+"preferredTransport": "JSONRPC",
+"version": "1.0.0",
+
+"provider": {
+"organization": "oneth.ai",
+"url": "https://oneth.ai"
+},
+
+"capabilities": {
+"streaming": true,
+"pushNotifications": true,
+"stateTransitionHistory": false
+},
+
+"securitySchemes": {
+"bearerAuth": {
+"type": "http",
+"scheme": "bearer",
+"bearerFormat": "JWT"
+}
+},
+
+"security": [
+{
+"bearerAuth": []
+}
+],
+
+"defaultInputModes": [
+"text/plain"
+],
+"defaultOutputModes": [
+"text/plain"
+],
+
+"skills": [
+{
+"id": "customer_management",
+"name": "Customer Management",
+"description": "고객 기본 정보와 구매 내역을 조회한다",
+"tags": [
+"customer",
+"crm",
+"purchase history"
+],
+"examples": [
+"홍길동 기본 정보 알려줘",
+"김철수 구매 내역 보여줘"
+],
+"inputModes": [
+"text/plain"
+],
+"outputModes": [
+"application/json"
+],
+"security": [
+{
+"bearerAuth": []
+}
+]
+}
+],
+
+"signatures": [
+{
+"protected": "eyJhbGciOiJIUzI1NiIsImtpZCI6InJlZ2lzdHJ5LWhzMjU2LWtleS0xIiwidHlwIjoiSldUIn0",
+"signature": "Izy6DJ-N1MJkUnvUnuTc5Y3jBB0RWFqCh11URlL5JpY",
+"header": {
+"kid": "registry-hs256-key-1"
+}
+}
+]
+}
