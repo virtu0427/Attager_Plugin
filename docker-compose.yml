@@ -251,11 +251,49 @@ services:
     container_name: orchestrator-client
     environment:
       - ORCHESTRATOR_RPC_URL=http://orchestrator:10000/
+      - JWT_SERVER_URL=http://jwt-server:8011
     depends_on:
       orchestrator:
         condition: service_started
+      jwt-server:
+        condition: service_started
     ports:
       - "8010:8010"
+    networks:
+      - agent-network
+
+  # JWT Auth Server
+  jwt-server:
+    build:
+      context: ./jwt-server
+      dockerfile: Dockerfile
+    container_name: attager-jwt-server
+    environment:
+      - SECRET_KEY=${JWT_SECRET_KEY:-supersecretjwt}
+      - ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${JWT_EXP_MINUTES:-60}
+      - PORT=8011
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8011
+    ports:
+      - "8011:8011"
+    networks:
+      - agent-network
+
+  # JWS Signing/Verification Server
+  jws-server:
+    build:
+      context: ./jws-server
+      dockerfile: Dockerfile
+    container_name: attager-jws-server
+    environment:
+      - JWS_SECRET=${JWS_SECRET:-mysecretkey}
+      - JWS_KID=${JWS_KID:-registry-hs256-key-1}
+      - POLICY_VERSION=${POLICY_VERSION:-registry.policy.v3}
+      - JWS_ISS=${JWS_ISS:-ans-registry.example}
+      - PORT=8012
+    command: uvicorn jws:app --host 0.0.0.0 --port 8012
+    ports:
+      - "8012:8012"
     networks:
       - agent-network
 
