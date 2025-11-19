@@ -24,12 +24,15 @@ logger.setLevel(logging.DEBUG)
 
 # --- 1. AgentCard 로더 ---
 
+AGENT_REGISTRY_BASE_URL = os.getenv("AGENT_REGISTRY_URL", "http://localhost:8000")
+
+
 def load_agent_cards(tool_context) -> List[str]:
     """
     레지스트리 서버에서 에이전트 카드 목록을 조회해서 state에 저장,
     에이전트 이름 리스트 반환
     """
-    url = "http://localhost:8000/agents"
+    url = f"{AGENT_REGISTRY_BASE_URL.rstrip('/')}/agents"
     resp = httpx.get(url)
     resp.raise_for_status()
     agents_data = resp.json()  # 레지스트리에서 내려주는 JSON 배열

@@ -19,6 +19,18 @@
      python app.py
      ```
 
+### Docker Compose로 실행
+루트 `docker-compose.yml`에 `orchestrator`와 `orchestrator-client` 서비스가 추가되었습니다.
+
+```bash
+# 오케스트레이터 서버와 클라이언트 UI 동시 실행
+docker compose up --build orchestrator orchestrator-client
+```
+
+- 클라이언트 UI: http://localhost:8010
+- 오케스트레이터 JSON-RPC: http://localhost:10000/
+
+
 ## 환경 변수
 - `ORCHESTRATOR_RPC_URL` (선택): 오케스트레이터 JSON-RPC 엔드포인트. 기본값은 `http://localhost:10000/` 입니다.
 

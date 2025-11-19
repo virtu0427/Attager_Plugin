@@ -222,6 +222,39 @@ services:
     networks:
       - agent-network
 
+  # Orchestrator Server
+  orchestrator:
+    build:
+      context: .
+      dockerfile: ./Orchestrator_new/Dockerfile
+    container_name: orchestrator
+    environment:
+      - AGENT_REGISTRY_URL=http://agent-registry:8000
+    depends_on:
+      agent-registry:
+        condition: service_started
+    ports:
+      - "10000:10000"
+    networks:
+      - agent-network
+    command: ["python", "__main__.py", "--host", "0.0.0.0", "--port", "10000"]
+
+  # Standalone Orchestrator chat client
+  orchestrator-client:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: orchestrator-client
+    environment:
+      - ORCHESTRATOR_RPC_URL=http://orchestrator:10000/
+    depends_on:
+      orchestrator:
+        condition: service_started
+    ports:
+      - "8010:8010"
+    networks:
+      - agent-network
+
 networks:
   agent-network:
     driver: bridge
