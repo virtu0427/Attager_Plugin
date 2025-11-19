@@ -1,0 +1,32 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies needed for common Python builds
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    gcc \
+    g++ \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy shared requirements and install
+COPY requirements.txt ./requirements.txt
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Copy shared utility modules first for better Docker caching
+COPY utils/ ./utils/
+
+# Copy IAM policy modules required by the orchestrator plugin
+COPY iam/ ./iam/
+
+# Copy orchestrator plugin sources
+COPY Orchestrator_plugin/ ./Orchestrator_plugin/
+
+ENV PYTHONPATH=/app
+
+EXPOSE 10000
+
+CMD ["python", "Orchestrator_plugin/__main__.py", "--host", "0.0.0.0", "--port", "10000"]
