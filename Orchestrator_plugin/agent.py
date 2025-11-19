@@ -5,6 +5,7 @@ import logging
 import httpx
 import asyncio
 from typing import List
+from urllib.parse import urlsplit, urlunsplit
 
 from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
@@ -40,6 +41,49 @@ AGENT_REGISTRY_URL = os.getenv("AGENT_REGISTRY_URL", "http://localhost:8000")
 POLICY_SERVER_URL = os.getenv("POLICY_SERVER_URL", "http://localhost:8005")
 LOG_SERVER_URL = os.getenv("LOG_SERVER_URL", POLICY_SERVER_URL)
 
+# 도커 내부에서 localhost로 등록된 카드 URL을 서비스 명으로 치환하기 위한 호스트 매핑
+AGENT_INTERNAL_HOST = os.getenv("AGENT_INTERNAL_HOST")
+PORT_HOST_MAP = {
+    "10001": os.getenv("DELIVERY_AGENT_HOST", "delivery-agent"),
+    "10002": os.getenv("ITEM_AGENT_HOST", "item-agent"),
+    "10003": os.getenv("QUALITY_AGENT_HOST", "quality-agent"),
+    "10004": os.getenv("VEHICLE_AGENT_HOST", "vehicle-agent"),
+}
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0"}
+
+
+def _rewrite_card_url_if_needed(card: AgentCard) -> AgentCard:
+    """Container 환경에서 localhost 카드 URL을 서비스 접근용으로 보정한다."""
+
+    card_url = getattr(card, "url", None)
+    if not card_url:
+        return card
+
+    parsed = urlsplit(card_url)
+    host = parsed.hostname
+    port = parsed.port
+
+    if host not in LOOPBACK_HOSTS:
+        return card
+
+    replacement_host = AGENT_INTERNAL_HOST or PORT_HOST_MAP.get(str(port))
+    if not replacement_host:
+        return card
+
+    new_netloc = f"{replacement_host}:{port}" if port else replacement_host
+    rewritten_url = urlunsplit((parsed.scheme, new_netloc, parsed.path, parsed.query, parsed.fragment))
+
+    logger.info("카드 URL을 컨테이너 접근용으로 교체: %s -> %s", card_url, rewritten_url)
+
+    if hasattr(card, "model_copy"):
+        return card.model_copy(update={"url": rewritten_url})
+    if hasattr(card, "copy"):
+        return card.copy(update={"url": rewritten_url})
+
+    # pydantic 외 객체 대비: 속성 대입 후 반환
+    card.url = rewritten_url
+    return card
+
 
 def load_agent_cards(tool_context) -> List[str]:
     """
@@ -64,6 +108,9 @@ def load_agent_cards(tool_context) -> List[str]:
                 card = AgentCard.model_validate(data)
             else:  # pydantic v1
                 card = AgentCard.parse_obj(data)
+
+            card = _rewrite_card_url_if_needed(card)
+
             name = getattr(card, "name", None) or card.url or "unknown_agent"
             cards[name] = card
         except Exception as exc:
