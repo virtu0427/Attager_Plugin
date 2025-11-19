@@ -222,6 +222,43 @@ services:
     networks:
       - agent-network
 
+  # Orchestrator Server
+  orchestrator:
+    build:
+      context: .
+      dockerfile: ./Orchestrator_plugin/Dockerfile.orchestrator
+    container_name: orchestrator
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - AGENT_REGISTRY_URL=http://agent-registry:8000
+      - POLICY_SERVER_URL=http://policy-server:8005
+      - LOG_SERVER_URL=http://policy-server:8005
+    depends_on:
+      agent-registry:
+        condition: service_started
+      policy-server:
+        condition: service_started
+    ports:
+      - "10000:10000"
+    networks:
+      - agent-network
+
+  # Standalone Orchestrator chat client
+  orchestrator-client:
+    build:
+      context: .
+      dockerfile: ./client/Dockerfile
+    container_name: orchestrator-client
+    environment:
+      - ORCHESTRATOR_RPC_URL=http://orchestrator:10000/
+    depends_on:
+      orchestrator:
+        condition: service_started
+    ports:
+      - "8010:8010"
+    networks:
+      - agent-network
+
 networks:
   agent-network:
     driver: bridge
