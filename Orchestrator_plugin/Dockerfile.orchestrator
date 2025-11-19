@@ -19,6 +19,9 @@ RUN pip install --upgrade pip \
 # Copy shared utility modules first for better Docker caching
 COPY utils/ ./utils/
 
+# Copy IAM policy modules required by the orchestrator plugin
+COPY iam/ ./iam/
+
 # Copy orchestrator plugin sources
 COPY Orchestrator_plugin/ ./Orchestrator_plugin/
 
