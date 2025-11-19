@@ -4,7 +4,6 @@ const messageInput = document.getElementById("message");
 const sendButton = document.getElementById("send-btn");
 const endpointLabel = document.getElementById("endpoint");
 const toast = document.getElementById("toast");
-const loginPanel = document.getElementById("login-panel");
 const loginForm = document.getElementById("login-form");
 const loginButton = document.getElementById("login-btn");
 const emailInput = document.getElementById("email");
@@ -12,6 +11,8 @@ const passwordInput = document.getElementById("password");
 const userCard = document.getElementById("user-card");
 const userEmail = document.getElementById("user-email");
 const userTenant = document.getElementById("user-tenant");
+const loginScreen = document.getElementById("login-screen");
+const chatScreen = document.getElementById("chat-screen");
 
 let authToken = null;
 let currentUser = null;
@@ -53,14 +54,21 @@ function updateUserCard(user) {
   userTenant.textContent = tenants;
 }
 
+function setScreenState(isAuthenticated) {
+  if (loginScreen) {
+    loginScreen.classList.toggle("active", !isAuthenticated);
+  }
+  if (chatScreen) {
+    chatScreen.classList.toggle("active", isAuthenticated);
+  }
+}
+
 function resetAuthState(showMessage = false) {
   authToken = null;
   currentUser = null;
   updateUserCard(null);
   setChatEnabled(false);
-  if (loginPanel) {
-    loginPanel.classList.remove("logged-in");
-  }
+  setScreenState(false);
   if (showMessage) {
     addMessage("system", "세션이 만료되었습니다. 다시 로그인해 주세요.");
     showToast("세션이 만료되었습니다.", true);
@@ -150,9 +158,7 @@ async function handleLogin(event) {
     authToken = data.access_token;
     currentUser = data.user;
     updateUserCard(currentUser);
-    if (loginPanel) {
-      loginPanel.classList.add("logged-in");
-    }
+    setScreenState(true);
     setChatEnabled(true);
     addMessage("system", `${currentUser.email}님 로그인되었습니다.`);
     showToast("로그인에 성공했습니다.");

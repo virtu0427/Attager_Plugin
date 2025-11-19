@@ -25,6 +25,47 @@ body {
   padding: 40px 28px 64px;
 }
 
+.screen {
+  display: none;
+}
+
+.screen.active {
+  display: block;
+}
+
+#login-screen {
+  max-width: 720px;
+  margin: 0 auto;
+  min-height: calc(100vh - 160px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+}
+
+.login-hero {
+  text-align: center;
+}
+
+.login-hero h1 {
+  margin: 12px 0 8px;
+  font-size: 38px;
+}
+
+.login-panel {
+  margin-top: 0;
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
 header {
   display: flex;
   justify-content: space-between;
@@ -124,10 +165,6 @@ header {
   color: var(--muted);
 }
 
-.login-panel.logged-in {
-  display: none;
-}
-
 .login-form {
   display: flex;
   flex-wrap: wrap;
@@ -160,6 +197,11 @@ header {
   opacity: 0.6;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+#chat-screen {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 main {
