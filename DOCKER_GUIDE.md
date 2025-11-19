@@ -15,6 +15,8 @@
 - **Item Agent** (포트 10002): 아이템 데이터 관리
 - **Quality Agent** (포트 10003): 품질 데이터 관리
 - **Vehicle Agent** (포트 10004): 차량 데이터 관리
+- **JWT Auth Server** (포트 8011): JWT 발급/검증용 인증 서버
+- **JWS Signing Server** (포트 8012): 에이전트 카드 서명/검증용 서버
 
 ## 실행 방법
 
