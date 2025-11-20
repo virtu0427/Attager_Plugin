@@ -388,8 +388,9 @@ class PolicyEnforcementPlugin(BasePlugin):
             return {}
         claims = self._decode_jwt(token)
         if claims:
-            if token != self._last_auth_token:
-                self._log_token_inspection(token, claims)
+            repeated_token = token == self._last_auth_token
+            self._log_token_inspection(token, claims, repeated=repeated_token)
+            self._log_policy_binding(token, claims)
             self._last_auth_token = token
         return claims
 
@@ -409,13 +410,26 @@ class PolicyEnforcementPlugin(BasePlugin):
             print(f"[PolicyPlugin] JWT decode 실패: {exc}")
             return {}
 
-    def _log_token_inspection(self, token: str, claims: Dict[str, Any]) -> None:
+    def _log_token_inspection(self, token: str, claims: Dict[str, Any], *, repeated: bool = False) -> None:
         roles = self._extract_roles_from_claims(claims)
         subject = claims.get("sub") or claims.get("email") or claims.get("user")
         token_preview = token if len(token) <= 18 else f"{token[:10]}...{token[-6:]}"
+        event = "JWT 재사용" if repeated else "JWT 로드"
         print(
-            "[PolicyPlugin][{}] JWT 로드: sub={}, roles={}, token={}".format(
-                self.agent_id, subject or "<unknown>", roles or [], token_preview
+            "[PolicyPlugin][{}] {}: sub={}, roles={}, token={}".format(
+                self.agent_id, event, subject or "<unknown>", roles or [], token_preview
+            )
+        )
+
+    def _log_policy_binding(self, token: str, claims: Dict[str, Any]) -> None:
+        roles = self._extract_roles_from_claims(claims)
+        subject = claims.get("sub") or claims.get("email") or claims.get("user") or "<unknown>"
+        token_preview = token if len(token) <= 18 else f"{token[:10]}...{token[-6:]}"
+        rule_keys = sorted(self._get_tool_rules().keys())
+        rule_summary = ", ".join(rule_keys) if rule_keys else "<no tool rules>"
+        print(
+            "[PolicyPlugin][{}] 정책 적용: subject={}, roles={}, token={}, rules={}".format(
+                self.agent_id, subject, roles or [], token_preview, rule_summary
             )
         )
 

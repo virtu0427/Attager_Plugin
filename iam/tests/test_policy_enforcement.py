@@ -125,3 +125,28 @@ async def test_callback_context_captures_token(plugin, capsys):
     output = capsys.readouterr().out
     assert "JWT 로드" in output
     assert "cbctx" in output
+
+
+@pytest.mark.asyncio
+async def test_policy_logging_includes_token_and_rules(plugin, capsys):
+    token = jwt.encode({"roles": ["admin"], "sub": "policy-log"}, "testsecret", algorithm="HS256")
+    tool_context = {"headers": {"Authorization": f"Bearer {token}"}}
+    tool = SimpleNamespace(name="call_remote_agent")
+
+    await plugin.before_tool_callback(
+        tool=tool,
+        tool_args={},
+        tool_context=tool_context,
+    )
+
+    await plugin.before_tool_callback(
+        tool=tool,
+        tool_args={},
+        tool_context=tool_context,
+    )
+
+    output = capsys.readouterr().out
+    assert "정책 적용" in output
+    assert "policy-log" in output
+    assert "call_remote_agent" in output
+    assert "JWT 재사용" in output
