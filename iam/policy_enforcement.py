@@ -394,21 +394,53 @@ class PolicyEnforcementPlugin(BasePlugin):
                 return cleaned
         return ""
 
-    def _extract_token_from_container(self, container: Any) -> str:
+    def _extract_token_from_container(self, container: Any, _visited: Optional[set[int]] = None) -> str:
         if not container:
             return ""
 
+        if _visited is None:
+            _visited = set()
+
+        ident = id(container)
+        if ident in _visited:
+            return ""
+        _visited.add(ident)
+
         if isinstance(container, dict):
             headers = container.get("headers") or container
-            token = headers.get("Authorization") or headers.get("authorization")
-            if token:
-                return self._sanitize_bearer(token)
-            token = headers.get("auth_token") or headers.get("token")
-            return self._sanitize_bearer(token)
+            for key in ("Authorization", "authorization", "auth_token", "token"):
+                if key in headers:
+                    return self._sanitize_bearer(headers.get(key))
 
-        headers = getattr(container, "headers", None) or getattr(container, "metadata", None)
-        if headers:
-            return self._extract_token_from_container(headers)
+            for nested_key in (
+                "headers",
+                "metadata",
+                "context",
+                "raw_request",
+                "request",
+                "envelope",
+            ):
+                nested = headers.get(nested_key)
+                cleaned = self._extract_token_from_container(nested, _visited)
+                if cleaned:
+                    return cleaned
+
+            for value in headers.values():
+                cleaned = self._extract_token_from_container(value, _visited)
+                if cleaned:
+                    return cleaned
+
+        if isinstance(container, (list, tuple, set)):
+            for item in container:
+                cleaned = self._extract_token_from_container(item, _visited)
+                if cleaned:
+                    return cleaned
+
+        for attr in ("headers", "metadata", "context", "raw_request", "request"):
+            candidate = getattr(container, attr, None)
+            cleaned = self._extract_token_from_container(candidate, _visited)
+            if cleaned:
+                return cleaned
 
         return ""
 
