@@ -86,6 +86,11 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")  # model_config.py와 동일한 환
 # Docker 환경에서는 host.docker.internal, 로컬에서는 localhost
 POLICY_SERVER_URL = os.getenv("POLICY_SERVER_URL", "http://localhost:8005")
 LOG_SERVER_URL = os.getenv("LOG_SERVER_URL", "http://localhost:8005")
+BOOTSTRAP_AUTH_TOKEN = (
+    os.getenv("IAM_BOOTSTRAP_AUTH_TOKEN")
+    or os.getenv("POLICY_BOOTSTRAP_TOKEN")
+    or os.getenv("AUTH_TOKEN")
+)
 
 # DeliveryAgent의 고유 agent_id (Orchestrator와 다른 정책 적용)
 AGENT_ID = "delivery_agent"
@@ -94,7 +99,8 @@ plugin = PolicyEnforcementPlugin(
     agent_id=AGENT_ID,
     gemini_api_key=GOOGLE_API_KEY,
     policy_server_url=POLICY_SERVER_URL,
-    log_server_url=LOG_SERVER_URL
+    log_server_url=LOG_SERVER_URL,
+    initial_auth_token=BOOTSTRAP_AUTH_TOKEN,
 )
 
 # --- 3. Runner + 세션 서비스 (플러그인 포함) ---

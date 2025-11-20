@@ -12,14 +12,28 @@ logger = logging.getLogger(__name__)
 
 
 class ADKAgentExecutor(AgentExecutor):
-    def __init__(self, agent, app_name="orchestrator_app", user_id="user1", session_id: str | None = None):
+    def __init__(
+        self,
+        agent,
+        *,
+        app_name: str = "orchestrator_app",
+        user_id: str = "user1",
+        session_id: str | None = None,
+        plugins=None,
+    ):
         self.agent = agent
         self.app_name = app_name
         self.user_id = user_id
         self.session_id = session_id or uuid4().hex
         self._session_created = False
+        self.plugins = plugins or []
         self.session_service = InMemorySessionService()
-        self.runner = Runner(agent=self.agent, app_name=self.app_name, session_service=self.session_service)
+        self.runner = Runner(
+            agent=self.agent,
+            app_name=self.app_name,
+            session_service=self.session_service,
+            plugins=self.plugins,
+        )
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         try:
@@ -48,10 +62,23 @@ class ADKAgentExecutor(AgentExecutor):
             final_response = None
 
             # Runner 실행 → 이벤트 스트림 수집
+            callback_context = self._build_callback_context(context)
+
+            # Pass the request headers/metadata to plugins before execution so
+            # policy enforcement can capture the client JWT on the very first
+            # fetch.
+            for plugin in self.plugins:
+                try:
+                    plugin._capture_auth_from_context(callback_context)  # noqa: SLF001
+                    plugin.fetch_policy(tool_context=callback_context)
+                except Exception:
+                    logger.exception("플러그인 사전 준비 중 오류")
+
             async for event in self.runner.run_async(
                 user_id=self.user_id,
                 session_id=self.session_id,
                 new_message=user_message,
+                run_config=None,
             ):
                 if event.content and event.content.parts:
                     for part in event.content.parts:
@@ -80,3 +107,16 @@ class ADKAgentExecutor(AgentExecutor):
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         return
+
+    def _build_callback_context(self, context: RequestContext) -> dict:
+        headers = {}
+        state = {}
+        if getattr(context, "call_context", None):
+            state = getattr(context.call_context, "state", {}) or {}
+            headers = state.get("headers") or {}
+
+        return {
+            "headers": headers,
+            "metadata": getattr(context, "metadata", {}) or {},
+            "state": state,
+        }

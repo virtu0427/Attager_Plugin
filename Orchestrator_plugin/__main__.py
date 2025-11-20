@@ -9,7 +9,10 @@ from a2a.types import (
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
-from Orchestrator_plugin.agent import root_agent as orchestrator_agent
+from Orchestrator_plugin.agent import (
+    plugin as policy_plugin,
+    root_agent as orchestrator_agent,
+)
 from Orchestrator_plugin.agent_executor import ADKAgentExecutor
 
 
@@ -37,7 +40,9 @@ def main(inhost: str, inport: int):
     )
 
     request_handler = DefaultRequestHandler(
-        agent_executor=ADKAgentExecutor(agent=orchestrator_agent),
+        agent_executor=ADKAgentExecutor(
+            agent=orchestrator_agent, plugins=[policy_plugin]
+        ),
         task_store=InMemoryTaskStore(),
     )
 

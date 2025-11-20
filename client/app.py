@@ -290,6 +290,13 @@ def _extract_token(raw: str | None) -> str:
     return raw.strip()
 
 
+def _bearer_header(raw_token: str) -> str:
+    token = raw_token.strip()
+    if not token:
+        return ""
+    return token if token.lower().startswith("bearer ") else f"Bearer {token}"
+
+
 @app.post("/api/chat", response_model=ChatResponse)
 async def send_message(
     body: ChatRequest,
@@ -301,15 +308,32 @@ async def send_message(
     if not token:
         raise HTTPException(status_code=401, detail="로그인 후 이용해 주세요.")
 
+    # 보조 헤더가 비어 있을 경우 토큰에서 사용자 이메일을 복구한다.
+    if not x_user_email:
+        with contextlib.suppress(HTTPException):
+            profile = _request_jwt_profile(token)
+            recovered_email = profile.get("email")
+            if recovered_email:
+                x_user_email = str(recovered_email)
+
     user_message = body.message.strip()
     if not user_message:
         raise HTTPException(status_code=400, detail="메시지를 입력해 주세요.")
 
     payload = _build_rpc_payload(user_message)
+    auth_header = _bearer_header(authorization or token)
+    # 메타데이터로도 토큰/사용자 정보를 전달하여 서버 측 플러그인이 초기 페치 단계에서 활용할 수 있다.
+    payload["params"].setdefault("metadata", {})
+    payload["params"]["metadata"].update(
+        {
+            "authorization": auth_header,
+            "user_email": x_user_email or "",
+        }
+    )
     rpc_result = await _send_rpc(
         payload,
         headers={
-            "Authorization": authorization or f"Bearer {token}",
+            "Authorization": auth_header,
             "X-User-Email": x_user_email or "",
         },
     )

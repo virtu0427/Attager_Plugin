@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 from typing import Any, Dict, Iterable, Optional, Sequence
 
@@ -31,6 +32,8 @@ class PolicyEnforcementPlugin(BasePlugin):
         gemini_api_key: Optional[str],
         policy_server_url: str,
         log_server_url: str,
+        initial_auth_token: Optional[str] = None,
+        initial_context: Optional[Any] = None,
     ) -> None:
         super().__init__(name=f"policy_enforcement_{agent_id}")
         self.agent_id = agent_id
@@ -46,6 +49,8 @@ class PolicyEnforcementPlugin(BasePlugin):
         self._last_auth_token: str | None = None
         self._captured_token_hint: str | None = None
         self._last_policy_fetch_token: str | None = None
+
+        self._ingest_initial_auth(initial_auth_token, initial_context)
 
         if gemini_api_key:
             genai.configure(api_key=gemini_api_key)
@@ -145,7 +150,13 @@ class PolicyEnforcementPlugin(BasePlugin):
     ) -> Optional[Dict[str, Any]]:
         """Validate tool invocations against IAM tool rules."""
         self._capture_auth_from_context(callback_context or tool_context)
-        self.fetch_policy(tool_context=callback_context or tool_context, tool_args=tool_args)
+        callback = callback_context or tool_context
+        self.fetch_policy(tool_context=callback, tool_args=tool_args)
+
+        token_for_tools = self._extract_auth_token(callback, tool_args)
+        if token_for_tools and hasattr(tool_context, "state"):
+            with contextlib.suppress(Exception):
+                tool_context.state.setdefault("auth_token", token_for_tools)
 
         if not self._policy_enabled():
             return None
@@ -352,6 +363,22 @@ class PolicyEnforcementPlugin(BasePlugin):
     # ------------------------------------------------------------------
     # Authentication helpers
     # ------------------------------------------------------------------
+    def _ingest_initial_auth(self, token_hint: Optional[str], context: Optional[Any]) -> None:
+        env_token = (
+            os.getenv("IAM_BOOTSTRAP_AUTH_TOKEN")
+            or os.getenv("POLICY_BOOTSTRAP_TOKEN")
+            or os.getenv("AUTH_TOKEN")
+        )
+
+        candidates = [token_hint, env_token, self._extract_token_from_container(context)]
+
+        for candidate in candidates:
+            cleaned = self._sanitize_bearer(candidate)
+            if cleaned:
+                self._captured_token_hint = cleaned
+                self._last_auth_token = cleaned
+                break
+
     def _log_policy_fetch(self, token: str) -> None:
         base_message = f"[PolicyPlugin] {self.agent_id} 정책 로드 완료"
 

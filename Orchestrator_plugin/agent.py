@@ -132,8 +132,14 @@ async def call_remote_agent(tool_context, agent_name: str, task: str):
         return {"error": f"Agent {agent_name} not found"}
 
     # 2. 클라이언트 준비
+    auth_token = ""
+    if hasattr(tool_context, "state"):
+        auth_token = tool_context.state.get("auth_token", "") or ""
+
+    default_headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else None
+
     try:
-        async with httpx.AsyncClient(timeout=30.0) as httpx_client:
+        async with httpx.AsyncClient(timeout=30.0, headers=default_headers) as httpx_client:
             from a2a.client import A2AClient
             client = A2AClient(httpx_client=httpx_client, agent_card=card)
 
@@ -198,6 +204,12 @@ root_agent = LlmAgent(
 # --- 5. IAM 기반 정책 플러그인 및 Runner 설정 ---
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")  # model_config.py와 동일한 환경변수 사용
+# 정책 초기 요청 시 사용할 토큰 부트스트랩 (클라이언트가 세션/환경변수로 전달)
+BOOTSTRAP_AUTH_TOKEN = (
+    os.getenv("IAM_BOOTSTRAP_AUTH_TOKEN")
+    or os.getenv("POLICY_BOOTSTRAP_TOKEN")
+    or os.getenv("AUTH_TOKEN")
+)
 
 # Orchestrator의 고유 agent_id
 AGENT_ID = "orchestrator"
@@ -206,7 +218,8 @@ plugin = PolicyEnforcementPlugin(
     agent_id=AGENT_ID,
     gemini_api_key=GOOGLE_API_KEY,
     policy_server_url=POLICY_SERVER_URL,
-    log_server_url=LOG_SERVER_URL
+    log_server_url=LOG_SERVER_URL,
+    initial_auth_token=BOOTSTRAP_AUTH_TOKEN,
 )
 
 session_service = InMemorySessionService()
