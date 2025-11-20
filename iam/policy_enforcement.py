@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, Optional, Sequence
+from dataclasses import dataclass
 
 import google.generativeai as genai
 import requests
@@ -131,7 +132,9 @@ class PolicyEnforcementPlugin(BasePlugin):
         if not rule:
             return None
 
-        violation = self._check_tool_rule(tool_name, tool_args, rule)
+        user_ctx = self._extract_user_context(tool_context)
+
+        violation = self._check_tool_rule(tool_name, tool_args, rule, user_ctx)
         if violation:
             self._send_log(
                 {
@@ -234,6 +237,7 @@ class PolicyEnforcementPlugin(BasePlugin):
         tool_name: str,
         tool_args: Dict[str, Any],
         rule: Dict[str, Any],
+        user_ctx: "_UserContext",
     ) -> Optional[str]:
         allowed_agents = rule.get("allowed_agents")
         if allowed_agents:
@@ -250,8 +254,17 @@ class PolicyEnforcementPlugin(BasePlugin):
         requires_auth = rule.get("requires_auth")
         if isinstance(requires_auth, str):
             requires_auth = requires_auth.lower() not in {"false", "0", "off"}
-        if requires_auth and not tool_args.get("auth_token"):
-            return "Authentication required for this tool"
+        if requires_auth:
+            auth_token = tool_args.get("auth_token") or user_ctx.jwt_token
+            if not auth_token:
+                return "Authentication required for this tool"
+
+            # 표준 Authorization 스킴을 도구 인자에 전파 (툴 구현부가 필요 시 활용)
+            if user_ctx.jwt_scheme and "auth_scheme" not in tool_args:
+                tool_args["auth_scheme"] = user_ctx.jwt_scheme
+            if user_ctx.user_email and "user_email" not in tool_args:
+                tool_args["user_email"] = user_ctx.user_email
+            tool_args.setdefault("auth_token", auth_token)
 
         max_results = rule.get("max_results")
         if isinstance(max_results, int):
@@ -279,3 +292,34 @@ class PolicyEnforcementPlugin(BasePlugin):
             )
         except Exception:  # pragma: no cover - logging best-effort
             pass
+
+    # ------------------------------------------------------------------
+    # Session helpers
+    # ------------------------------------------------------------------
+    def _extract_user_context(self, tool_context: Any) -> "_UserContext":
+        """Pull JWT/email information from the runner state.
+
+        ADK의 ToolContext는 상태 정보를 `state` 딕셔너리에 보관한다. 오케스트레이터가
+        `state_delta`로 전달한 JWT 토큰/스킴/이메일 값을 우선적으로 추출하여 도구 검증 시
+        사용할 수 있도록 한다.
+        """
+
+        state = getattr(tool_context, "state", None) or {}
+        jwt_token = state.get("user_jwt_token") or state.get("user_auth_header")
+        jwt_scheme = state.get("user_jwt_scheme")
+        user_email = state.get("user_email")
+
+        # user_auth_header는 "Bearer <token>" 형태일 수 있으므로 분리
+        if jwt_token and not jwt_scheme and isinstance(jwt_token, str) and " " in jwt_token:
+            scheme, _, token = jwt_token.partition(" ")
+            jwt_scheme = scheme or None
+            jwt_token = token or jwt_token
+
+        return _UserContext(jwt_token=jwt_token, jwt_scheme=jwt_scheme, user_email=user_email)
+
+
+@dataclass
+class _UserContext:
+    jwt_token: Optional[str]
+    jwt_scheme: Optional[str]
+    user_email: Optional[str]
