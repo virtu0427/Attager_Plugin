@@ -7,6 +7,14 @@
     <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
+    <nav class="tab-bar" aria-label="Navigation">
+      <div class="tab-buttons">
+        <button id="tab-login" class="tab active" type="button">Login</button>
+        <button id="tab-chat" class="tab" type="button">Chat</button>
+      </div>
+      <button id="logout-btn" class="ghost" type="button" disabled>로그아웃</button>
+    </nav>
+
     <div id="login-screen" class="screen active">
       <section class="login-panel" id="login-panel">
         <div class="login-hero">
@@ -19,6 +27,7 @@
         <div class="login-panel-text">
           <h2>JWT 로그인</h2>
           <p>등록된 계정으로 로그인한 뒤 에이전트 채팅을 시작하세요.</p>
+          <p class="hint">토큰은 클라이언트 쿠키에 저장됩니다.</p>
         </div>
         <form id="login-form" class="login-form" autocomplete="off">
           <label class="sr-only" for="email">이메일</label>

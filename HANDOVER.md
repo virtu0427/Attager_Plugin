@@ -7,7 +7,7 @@
   - Flask 기반 **관리 프론트엔드** (`frontend/`, 포트 8006)
   - FastAPI 기반 **IAM 정책 서버** (`Orchestrator_plugin/server_redis.py`, 포트 8005)
   - FastAPI 기반 **오케스트레이터 클라이언트/게이트웨이** (`client/app.py`, 포트 8010) – `/login`→`/chat` 경로 분리, 서버 세션/쿠키로 JWT 유지
-  - 4종 도메인 **업무 에이전트** (배송, 상품, 품질, 차량)과 오케스트레이터 (`agents/`, `Orchestrator_new/`)
+  - 4종 도메인 **업무 에이전트** (배송, 상품, 품질, 차량)과 오케스트레이터 (`agents/`, `Orchestrator_new/`) – 품질 에이전트 경로는 `agents/qulity_agent/`로 정의되어 있음
   - **JWT 발급 서버** (`jwt-server/`, 포트 8011)와 **JWS 서명 서버** (`jws-server/`, 포트 8012)
   - **Redis 2종 분리**: 업무 데이터(`redis-agents`, 포트 6379)와 IAM/정책 데이터(`redis-iam`, 포트 6380)
   - **Agent Registry**(옵션)와 프론트 UI (`agent-reg/`, `agent-reg/frontend/`)
@@ -35,8 +35,8 @@
 | 프론트엔드 IAM UI | `frontend/` | Flask + Vanilla JS | 8006 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, `PORT` |
 | IAM 정책 서버 | `Orchestrator_plugin/` | FastAPI | 8005 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_DB`, `PORT` |
 | 오케스트레이터 게이트웨이/클라이언트 | `client/` | FastAPI | 8010 | `JWT_SERVER_URL`, `SESSION_SECRET`, `ORCHESTRATOR_RPC_URL` |
-| JWT 인증 서버 | `jwt-server/` | FastAPI | 8011 | `JWT_SECRET`, `JWT_ALGORITHM`, `JWT_EXP_MINUTES` |
-| JWS 서명 서버 | `jws-server/` | FastAPI | 8012 | `PRIVATE_KEY_PATH`, `PUBLIC_KEY_PATH` |
+| JWT 인증 서버 | `jwt-server/` | FastAPI | 8011 | `SECRET_KEY`, `ALGORITHM`, `ACCESS_TOKEN_EXPIRE_MINUTES` |
+| JWS 서명 서버 | `jws-server/` | FastAPI | 8012 | `JWS_SECRET`, `JWS_KID`, `POLICY_VERSION`, `JWS_ISS` |
 | 오케스트레이터 | `Orchestrator_new/` | Python CLI | 10000 | `POLICY_SERVER_URL`, `LOG_SERVER_URL` |
 | 업무 에이전트 (배송/상품/품질/차량) | `agents/*` | FastAPI + Gemini SDK | 10001~10004 | `AGENT_REDIS_HOST/PORT/DB`, `POLICY_SERVER_URL`, `LOG_SERVER_URL`, `GOOGLE_API_KEY` |
 | 에이전트 Redis | `redis-agents` | Redis 7 | 6379 | `AGENT_REDIS_*` |
@@ -53,9 +53,9 @@
    FALLBACK_TO_LOCAL=true
    OLLAMA_HOST=host.docker.internal
    SESSION_SECRET=changeme-session
-   JWT_SECRET_KEY=supersecretjwt
-   JWT_ALGORITHM=HS256
-   JWT_EXP_MINUTES=60
+   SECRET_KEY=supersecretjwt
+   ALGORITHM=HS256
+   ACCESS_TOKEN_EXPIRE_MINUTES=60
    ```
 2. 빌드 및 실행
    ```bash

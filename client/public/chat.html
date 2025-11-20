@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orchestrator Agent 채팅</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body data-page="chat">
+    <nav class="top-nav" aria-label="Navigation">
+      <div class="brand">
+        <a href="/chat">Orchestrator Client</a>
+      </div>
+      <div class="nav-links">
+        <a href="/login">Login</a>
+        <a class="active" href="/chat">Chat</a>
+        <button id="logout-btn" class="ghost" type="button">로그아웃</button>
+      </div>
+    </nav>
+
+    <header>
+      <div class="title">
+        <div class="eyebrow">새로운 UI · 독립 실행</div>
+        <h1>Orchestrator Agent 채팅</h1>
+        <p class="subtitle">
+          오케스트레이터 에이전트와 직접 대화하고 워크플로우를 시험해 보세요.
+        </p>
+      </div>
+      <div class="header-cards">
+        <div class="status-card">
+          <div class="label">RPC 엔드포인트</div>
+          <div class="value" id="endpoint">/</div>
+          <p class="hint">
+            <strong>ORCHESTRATOR_RPC_URL</strong> 환경 변수로 엔드포인트를 변경할 수 있습니다.
+          </p>
+        </div>
+        <div class="status-card user-card inactive" id="user-card">
+          <div class="label">접속 사용자</div>
+          <div class="value" id="user-email">로그인 필요</div>
+          <p class="hint" id="user-tenant">JWT 인증을 완료해 주세요.</p>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="chat-panel">
+        <div id="chat-log" class="chat-log" aria-live="polite"></div>
+        <form id="chat-form" class="chat-form" autocomplete="off">
+          <label for="message" class="sr-only">메시지 입력</label>
+          <input
+            id="message"
+            name="message"
+            type="text"
+            placeholder="로그인 후 에이전트에게 요청을 입력하세요..."
+            required
+            disabled
+          />
+          <button type="submit" id="send-btn" disabled>전송</button>
+        </form>
+      </section>
+      <aside class="tips">
+        <h2>사용 가이드</h2>
+        <ul>
+          <li>별도 서버로 구동되며 기존 <code>frontend/</code>와 격리됩니다.</li>
+          <li>오케스트레이터는 <code>message/send</code> JSON-RPC로 호출합니다.</li>
+          <li>에이전트 카드가 Redis/레지스트리에 존재해야 정상적으로 위임합니다.</li>
+        </ul>
+      </aside>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="assertive"></div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Sequence
+import os
+from typing import Any, Dict, Iterable, Optional, Sequence
 
+import jwt
 import google.generativeai as genai
 import requests
 from google.adk.plugins.base_plugin import BasePlugin
@@ -37,6 +39,12 @@ class PolicyEnforcementPlugin(BasePlugin):
         self.gemini_api_key = gemini_api_key
         self._models: Dict[str, Any] = {}
         self.policy: Dict[str, Any] = {}
+        self._jwt_secret = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY")
+        self._jwt_public_key = os.getenv("JWT_PUBLIC_KEY")
+        self._jwt_algorithm = os.getenv("JWT_ALGORITHM") or os.getenv("ALGORITHM") or "HS256"
+        self._jwt_audience = os.getenv("JWT_AUDIENCE")
+        self._last_auth_token: str | None = None
+        self._captured_token_hint: str | None = None
 
         if gemini_api_key:
             genai.configure(api_key=gemini_api_key)
@@ -72,6 +80,7 @@ class PolicyEnforcementPlugin(BasePlugin):
         **kwargs: Any,
     ) -> Optional[Any]:
         """Validate user prompts before the LLM is invoked."""
+        self._capture_auth_from_context(callback_context)
         if not self._policy_enabled():
             return None
 
@@ -115,8 +124,12 @@ class PolicyEnforcementPlugin(BasePlugin):
         tool: Any,
         tool_args: Dict[str, Any],
         tool_context: Any,
+        callback_context: Any = None,
+        **kwargs: Any,
     ) -> Optional[Dict[str, Any]]:
         """Validate tool invocations against IAM tool rules."""
+        self._capture_auth_from_context(callback_context or tool_context)
+
         if not self._policy_enabled():
             return None
 
@@ -131,7 +144,7 @@ class PolicyEnforcementPlugin(BasePlugin):
         if not rule:
             return None
 
-        violation = self._check_tool_rule(tool_name, tool_args, rule)
+        violation = self._check_tool_rule(tool_name, tool_args, rule, tool_context)
         if violation:
             self._send_log(
                 {
@@ -161,6 +174,22 @@ class PolicyEnforcementPlugin(BasePlugin):
 
     def _get_prompt_rules(self) -> Sequence[Dict[str, Any]]:
         rules = self.policy.get("prompt_validation_rules", []) or []
+        if not rules:
+            policies = self.policy.get("policies")
+            if isinstance(policies, dict):
+                prompt_validation = policies.get("prompt_validation") or {}
+                system_prompt = prompt_validation.get("system_prompt", "")
+                model = prompt_validation.get("model")
+                enabled = prompt_validation.get("enabled", True)
+                if system_prompt:
+                    rules = [
+                        {
+                            "system_prompt": system_prompt,
+                            "model": model,
+                            "enabled": enabled,
+                        }
+                    ]
+
         enabled_rules = []
         for rule in rules:
             enabled = rule.get("enabled", True)
@@ -171,7 +200,19 @@ class PolicyEnforcementPlugin(BasePlugin):
         return enabled_rules
 
     def _get_tool_rules(self) -> Dict[str, Dict[str, Any]]:
-        rules = self.policy.get("tool_validation_rules") or {}
+        rules = self.policy.get("tool_validation_rules")
+
+        if not rules:
+            policies = self.policy.get("policies")
+            if isinstance(policies, dict):
+                tool_validation = policies.get("tool_validation") or {}
+                enabled = tool_validation.get("enabled", True)
+                if isinstance(enabled, str):
+                    enabled = enabled.lower() not in {"false", "0", "off"}
+                if not enabled:
+                    return {}
+                rules = tool_validation.get("rules")
+
         if isinstance(rules, dict):
             return rules
         return {}
@@ -234,6 +275,7 @@ class PolicyEnforcementPlugin(BasePlugin):
         tool_name: str,
         tool_args: Dict[str, Any],
         rule: Dict[str, Any],
+        tool_context: Any,
     ) -> Optional[str]:
         allowed_agents = rule.get("allowed_agents")
         if allowed_agents:
@@ -250,8 +292,18 @@ class PolicyEnforcementPlugin(BasePlugin):
         requires_auth = rule.get("requires_auth")
         if isinstance(requires_auth, str):
             requires_auth = requires_auth.lower() not in {"false", "0", "off"}
-        if requires_auth and not tool_args.get("auth_token"):
+        if requires_auth and not self._extract_auth_token(tool_context, tool_args):
             return "Authentication required for this tool"
+
+        required_roles = rule.get("required_roles") or rule.get("required_role")
+        normalized_roles = self._normalize_required_roles(required_roles)
+        if normalized_roles:
+            claims = self._get_auth_claims(tool_context, tool_args)
+            user_roles = self._extract_roles_from_claims(claims)
+            if not user_roles:
+                return "Role information missing from JWT token"
+            if not self._roles_satisfied(user_roles, normalized_roles):
+                return f"Tool '{tool_name}' requires role(s): {', '.join(normalized_roles)}"
 
         max_results = rule.get("max_results")
         if isinstance(max_results, int):
@@ -279,3 +331,124 @@ class PolicyEnforcementPlugin(BasePlugin):
             )
         except Exception:  # pragma: no cover - logging best-effort
             pass
+
+    # ------------------------------------------------------------------
+    # Authentication helpers
+    # ------------------------------------------------------------------
+    def _capture_auth_from_context(self, callback_context: Any) -> None:
+        token = self._extract_token_from_container(callback_context)
+        if token:
+            self._captured_token_hint = token
+
+    def _extract_auth_token(self, tool_context: Any, tool_args: Dict[str, Any]) -> str:
+        tool_args = tool_args or {}
+        candidates = [
+            tool_args.get("auth_token"),
+            tool_args.get("token"),
+            tool_args.get("Authorization"),
+            tool_args.get("authorization"),
+        ]
+
+        candidates.append(self._extract_token_from_container(tool_context))
+        candidates.append(self._extract_token_from_container(getattr(tool_context, "metadata", None)))
+
+        if self._captured_token_hint:
+            candidates.append(self._captured_token_hint)
+
+        if self._last_auth_token:
+            candidates.append(self._last_auth_token)
+
+        for candidate in candidates:
+            cleaned = self._sanitize_bearer(candidate)
+            if cleaned:
+                return cleaned
+        return ""
+
+    def _extract_token_from_container(self, container: Any) -> str:
+        if not container:
+            return ""
+
+        if isinstance(container, dict):
+            headers = container.get("headers") or container
+            token = headers.get("Authorization") or headers.get("authorization")
+            if token:
+                return self._sanitize_bearer(token)
+            token = headers.get("auth_token") or headers.get("token")
+            return self._sanitize_bearer(token)
+
+        headers = getattr(container, "headers", None) or getattr(container, "metadata", None)
+        if headers:
+            return self._extract_token_from_container(headers)
+
+        return ""
+
+    def _get_auth_claims(self, tool_context: Any, tool_args: Dict[str, Any]) -> Dict[str, Any]:
+        token = self._extract_auth_token(tool_context, tool_args)
+        if not token:
+            return {}
+        claims = self._decode_jwt(token)
+        if claims:
+            if token != self._last_auth_token:
+                self._log_token_inspection(token, claims)
+            self._last_auth_token = token
+        return claims
+
+    def _decode_jwt(self, token: str) -> Dict[str, Any]:
+        options = {"verify_signature": bool(self._jwt_secret or self._jwt_public_key)}
+        verify_args: Dict[str, Any] = {"algorithms": [self._jwt_algorithm]}
+
+        if self._jwt_audience:
+            verify_args["audience"] = self._jwt_audience
+
+        key = self._jwt_public_key or self._jwt_secret
+        try:
+            if key:
+                return jwt.decode(token, key=key, options=options, **verify_args)
+            return jwt.decode(token, options={"verify_signature": False})
+        except Exception as exc:  # pragma: no cover - runtime token parsing
+            print(f"[PolicyPlugin] JWT decode 실패: {exc}")
+            return {}
+
+    def _log_token_inspection(self, token: str, claims: Dict[str, Any]) -> None:
+        roles = self._extract_roles_from_claims(claims)
+        subject = claims.get("sub") or claims.get("email") or claims.get("user")
+        token_preview = token if len(token) <= 18 else f"{token[:10]}...{token[-6:]}"
+        print(
+            "[PolicyPlugin][{}] JWT 로드: sub={}, roles={}, token={}".format(
+                self.agent_id, subject or "<unknown>", roles or [], token_preview
+            )
+        )
+
+    def _normalize_required_roles(self, required_roles: Any) -> list[str]:
+        if not required_roles:
+            return []
+        if isinstance(required_roles, str):
+            required_roles = [required_roles]
+        if isinstance(required_roles, Iterable):
+            return [str(role).strip().lower() for role in required_roles if str(role).strip()]
+        return []
+
+    def _extract_roles_from_claims(self, claims: Dict[str, Any]) -> list[str]:
+        if not isinstance(claims, dict):
+            return []
+        roles: list[str] = []
+        for key in ("roles", "role", "permissions", "scopes", "scope"):
+            value = claims.get(key)
+            if isinstance(value, str):
+                roles.extend(item.strip().lower() for item in value.split() if item.strip())
+            elif isinstance(value, Iterable):
+                roles.extend(str(item).strip().lower() for item in value if str(item).strip())
+        return roles
+
+    def _roles_satisfied(self, user_roles: list[str], required_roles: list[str]) -> bool:
+        user_role_set = {role.lower() for role in user_roles}
+        return any(role.lower() in user_role_set for role in required_roles)
+
+    @staticmethod
+    def _sanitize_bearer(token: Any) -> str:
+        if not token:
+            return ""
+        token_str = str(token).strip()
+        if token_str.lower().startswith("bearer "):
+            return token_str[7:].strip()
+        return token_str
