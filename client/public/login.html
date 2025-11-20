@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orchestrator Agent 로그인</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body data-page="login">
+    <nav class="top-nav" aria-label="Navigation">
+      <div class="brand">
+        <a href="/login">Orchestrator Client</a>
+      </div>
+      <div class="nav-links">
+        <a class="active" href="/login">Login</a>
+        <a href="/chat">Chat</a>
+      </div>
+    </nav>
+
+    <main id="login-screen" class="screen active">
+      <section class="login-panel" id="login-panel">
+        <div class="login-hero">
+          <div class="eyebrow">JWT 인증 필요</div>
+          <h1>Orchestrator Agent 로그인</h1>
+          <p class="subtitle">
+            JWT 서버에서 인증을 마치면 채팅 화면으로 이동합니다.
+          </p>
+        </div>
+        <div class="login-panel-text">
+          <h2>JWT 로그인</h2>
+          <p>등록된 계정으로 로그인한 뒤 에이전트 채팅을 시작하세요.</p>
+          <p class="hint">토큰은 클라이언트 쿠키에 저장됩니다.</p>
+        </div>
+        <form id="login-form" class="login-form" autocomplete="off">
+          <label class="sr-only" for="email">이메일</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            placeholder="user@example.com"
+            required
+          />
+          <label class="sr-only" for="password">비밀번호</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            placeholder="비밀번호"
+            required
+          />
+          <button type="submit" id="login-btn">로그인</button>
+        </form>
+        <p class="hint" id="session-hint"></p>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="assertive"></div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

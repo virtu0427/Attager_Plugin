@@ -22,7 +22,60 @@ body {
     var(--bg);
   color: var(--text);
   font-family: "Pretendard", "Inter", system-ui, -apple-system, sans-serif;
-  padding: 40px 28px 64px;
+  padding: 32px 28px 64px;
+}
+
+.top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  gap: 12px;
+}
+
+.brand a {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-links a {
+  color: var(--text);
+  text-decoration: none;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background 0.2s, color 0.2s;
+  box-shadow: var(--shadow);
+}
+
+.nav-links a.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #0b1119;
+  border-color: transparent;
+}
+
+.ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .screen {
