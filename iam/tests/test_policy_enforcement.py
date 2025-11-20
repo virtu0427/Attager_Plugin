@@ -175,3 +175,21 @@ def test_fetch_policy_logs_token_with_claims(monkeypatch, policy_payload, capsys
     assert "정책 로드 완료" in output
     assert "fetch-log" in output
     assert "admin" in output
+
+
+@pytest.mark.asyncio
+async def test_policy_fetch_uses_captured_token(plugin, capsys):
+    token = jwt.encode({"roles": ["admin"], "sub": "fetch-callback"}, "testsecret", algorithm="HS256")
+    capsys.readouterr()
+    tool = SimpleNamespace(name="call_remote_agent")
+
+    await plugin.before_tool_callback(
+        tool=tool,
+        tool_args={},
+        tool_context={},
+        callback_context={"headers": {"Authorization": f"Bearer {token}"}},
+    )
+
+    output = capsys.readouterr().out
+    assert "정책 로드 완료" in output
+    assert "fetch-callback" in output

@@ -45,6 +45,7 @@ class PolicyEnforcementPlugin(BasePlugin):
         self._jwt_audience = os.getenv("JWT_AUDIENCE")
         self._last_auth_token: str | None = None
         self._captured_token_hint: str | None = None
+        self._last_policy_fetch_token: str | None = None
 
         if gemini_api_key:
             genai.configure(api_key=gemini_api_key)
@@ -55,17 +56,30 @@ class PolicyEnforcementPlugin(BasePlugin):
     # ------------------------------------------------------------------
     # Policy retrieval helpers
     # ------------------------------------------------------------------
-    def fetch_policy(self, *, tool_context: Any = None, tool_args: Optional[Dict[str, Any]] = None) -> None:
+    def fetch_policy(
+        self,
+        *,
+        tool_context: Any = None,
+        tool_args: Optional[Dict[str, Any]] = None,
+        force: bool = False,
+    ) -> None:
         """Fetch the latest IAM policy for the configured agent."""
         token_for_logging = self._extract_auth_token(tool_context, tool_args or {})
+        token_changed = token_for_logging != self._last_policy_fetch_token
+        should_refresh = force or token_changed or not self.policy
+
         try:
-            resp = requests.get(
-                f"{self.policy_server_url}/api/iam/policy/{self.agent_id}",
-                timeout=3,
-            )
-            resp.raise_for_status()
-            self.policy = resp.json()
-            self._log_policy_fetch(token_for_logging)
+            if should_refresh:
+                resp = requests.get(
+                    f"{self.policy_server_url}/api/iam/policy/{self.agent_id}",
+                    timeout=3,
+                )
+                resp.raise_for_status()
+                self.policy = resp.json()
+                if token_for_logging:
+                    self._last_policy_fetch_token = token_for_logging
+
+            self._log_policy_fetch(token_for_logging or self._last_policy_fetch_token or "")
         except Exception as exc:  # pragma: no cover - network failures during runtime
             print(f"[PolicyPlugin] 정책 로드 실패: {exc}")
             self.policy = {}
@@ -82,6 +96,7 @@ class PolicyEnforcementPlugin(BasePlugin):
     ) -> Optional[Any]:
         """Validate user prompts before the LLM is invoked."""
         self._capture_auth_from_context(callback_context)
+        self.fetch_policy(tool_context=callback_context)
         if not self._policy_enabled():
             return None
 
@@ -130,6 +145,7 @@ class PolicyEnforcementPlugin(BasePlugin):
     ) -> Optional[Dict[str, Any]]:
         """Validate tool invocations against IAM tool rules."""
         self._capture_auth_from_context(callback_context or tool_context)
+        self.fetch_policy(tool_context=callback_context or tool_context, tool_args=tool_args)
 
         if not self._policy_enabled():
             return None
