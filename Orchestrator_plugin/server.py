@@ -22,17 +22,18 @@ AGENT_POLICIES = {
                     "3. 위배되는 내용이 있으면 VIOLATION, 아니면 SAFE를 반환."
                 )
             },
-            "tool_validation": {
-                "enabled": True,
-                "rules": {
-                    "call_remote_agent": {
-                        "allowed_agents": ["Delivery Agent", "Item Agent", "Quality Agent", "Vehicle Agent"],
-                        "max_task_length": 500
-                    },
-                    "load_agent_cards": {
-                        "rate_limit": 10  # 최대 호출 횟수
+                "tool_validation": {
+                    "enabled": True,
+                    "rules": {
+                        "call_remote_agent": {
+                            "allowed_agents": ["Delivery Agent", "Item Agent", "Quality Agent", "Vehicle Agent"],
+                        "max_task_length": 500,
+                        "required_roles": ["admin"],
+                        },
+                        "load_agent_cards": {
+                            "rate_limit": 10  # 최대 호출 횟수
+                        }
                     }
-                }
             },
             "response_filtering": {
                 "enabled": False,

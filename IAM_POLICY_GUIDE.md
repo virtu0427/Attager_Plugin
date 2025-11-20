@@ -234,6 +234,12 @@ async def before_tool_callback(self, *, callback_context, tool_call, **kwargs):
    "max_results": 100
    ```
 
+5. **`required_roles`** - JWT에 포함된 역할 기반 접근 제어
+   ```python
+   "required_roles": ["admin", "superuser"]
+   ```
+   `policy_enforcement.py`가 JWT 토큰을 해석해 `roles`, `role`, `permissions`, `scope` 클레임을 조회합니다. 값이 문자열이면 공백으로 분리하고, 배열이면 각 항목을 모두 비교합니다. 최소 한 개의 요구 역할이 사용자 토큰에 있어야 툴 호출이 허용됩니다.
+
 ### 새 규칙 추가 방법
 
 `policy_enforcement_plugin.py`의 `_check_tool_rule` 메서드에 추가:

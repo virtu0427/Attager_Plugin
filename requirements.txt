@@ -7,6 +7,7 @@ fastapi>=0.115.0              # Web framework (if needed by google-adk)
 litellm>=1.49.0               # LiteLLM for local model support
 redis>=5.1.0                  # Redis for data storage
 a2a-sdk>=0.1.0                # Agent-to-Agent communication
+PyJWT>=2.10.0                 # JWT validation for IAM policy enforcement
 
 # Environment and configuration
 python-dotenv>=1.0.0          # Environment variable management (.env files)
