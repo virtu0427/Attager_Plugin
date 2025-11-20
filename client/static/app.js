@@ -105,6 +105,7 @@ async function sendMessage(event) {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${authToken}`,
+        "X-User-Email": currentUser?.email || "",
       },
       body: JSON.stringify({ message: text }),
     });

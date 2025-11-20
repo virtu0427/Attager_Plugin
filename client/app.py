@@ -198,12 +198,13 @@ def login(body: LoginRequest) -> LoginResponse:
     return LoginResponse(access_token=access_token, token_type=token_type, user=user_profile)
 
 
-async def _send_rpc(payload: dict) -> dict:
+async def _send_rpc(payload: dict, headers: dict | None = None) -> dict:
     try:
         response = await asyncio.to_thread(
             requests.post,
             ORCHESTRATOR_RPC_URL,
             json=payload,
+            headers=headers,
             timeout=30,
         )
     except requests.RequestException as exc:  # pragma: no cover - runtime safety
@@ -234,7 +235,11 @@ def _extract_token(authorization: str | None) -> str:
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def send_message(body: ChatRequest, authorization: str | None = Header(default=None)) -> ChatResponse:
+async def send_message(
+    body: ChatRequest,
+    authorization: str | None = Header(default=None),
+    x_user_email: str | None = Header(default=None, alias="X-User-Email"),
+) -> ChatResponse:
     token = _extract_token(authorization)
     if not token:
         raise HTTPException(status_code=401, detail="로그인 후 이용해 주세요.")
@@ -244,7 +249,13 @@ async def send_message(body: ChatRequest, authorization: str | None = Header(def
         raise HTTPException(status_code=400, detail="메시지를 입력해 주세요.")
 
     payload = _build_rpc_payload(user_message)
-    rpc_result = await _send_rpc(payload)
+    rpc_result = await _send_rpc(
+        payload,
+        headers={
+            "Authorization": authorization,
+            "X-User-Email": x_user_email or "",
+        },
+    )
 
     result_obj = rpc_result.get("result") or rpc_result.get("root", {}).get("result")
     reply_text = _extract_reply_from_result(result_obj) if result_obj else ""
