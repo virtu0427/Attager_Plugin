@@ -131,9 +131,18 @@ async def call_remote_agent(tool_context, agent_name: str, task: str):
     if not card:
         return {"error": f"Agent {agent_name} not found"}
 
+    # 1-1. 사용자 세션에서 전달된 JWT/Email 헤더 수집
+    default_headers = {}
+    auth_header = tool_context.state.get("user_auth_header")
+    user_email = tool_context.state.get("user_email")
+    if auth_header:
+        default_headers["Authorization"] = auth_header
+    if user_email:
+        default_headers["X-User-Email"] = user_email
+
     # 2. 클라이언트 준비
     try:
-        async with httpx.AsyncClient(timeout=30.0) as httpx_client:
+        async with httpx.AsyncClient(timeout=30.0, headers=default_headers or None) as httpx_client:
             from a2a.client import A2AClient
             client = A2AClient(httpx_client=httpx_client, agent_card=card)
 

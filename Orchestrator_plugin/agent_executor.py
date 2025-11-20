@@ -34,6 +34,28 @@ class ADKAgentExecutor(AgentExecutor):
                 finally:
                     self._session_created = True
 
+            # 인증 헤더에서 JWT 및 사용자 정보를 추출해 세션 상태에 저장
+            state_delta: dict | None = None
+            call_ctx = getattr(context, "call_context", None)
+            headers = {}
+            if call_ctx and getattr(call_ctx, "state", None):
+                headers = call_ctx.state.get("headers", {}) or {}
+
+            auth_header = headers.get("authorization") or headers.get("Authorization")
+            user_email = headers.get("x-user-email") or headers.get("X-User-Email")
+
+            if auth_header or user_email:
+                state_delta = {}
+                state_delta["user_auth_header"] = auth_header
+                if auth_header:
+                    scheme, _, token = auth_header.partition(" ")
+                    if token:
+                        state_delta["user_jwt_token"] = token
+                    if scheme:
+                        state_delta["user_jwt_scheme"] = scheme
+                if user_email:
+                    state_delta["user_email"] = user_email
+
             # 사용자 입력 추출
             user_input = ""
             if context.message and context.message.parts:
@@ -52,6 +74,7 @@ class ADKAgentExecutor(AgentExecutor):
                 user_id=self.user_id,
                 session_id=self.session_id,
                 new_message=user_message,
+                state_delta=state_delta,
             ):
                 if event.content and event.content.parts:
                     for part in event.content.parts:
