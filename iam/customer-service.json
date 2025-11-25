@@ -1,0 +1,18 @@
+{
+	"template": "custom",
+	"author": "secutiry manager",
+	"tenant": "customer-service",
+	"allowed_list": [
+		{
+			"agent_id": "Item Agent",
+			"allowed_tools": [
+				"get_item_details",
+				"track_item_inventory"
+			]
+		},
+        {
+            "agent_id": "Orchestrator",
+            "allowed_tools": ["call_remote_agent", "load_agent_cards", "return_result"]
+        }
+	]
+}

@@ -93,7 +93,7 @@ BOOTSTRAP_AUTH_TOKEN = (
 )
 
 # DeliveryAgent의 고유 agent_id (Orchestrator와 다른 정책 적용)
-AGENT_ID = "delivery_agent"
+AGENT_ID = "Delivery Agent"
 
 plugin = PolicyEnforcementPlugin(
     agent_id=AGENT_ID,

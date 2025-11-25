@@ -70,7 +70,6 @@ class ADKAgentExecutor(AgentExecutor):
             for plugin in self.plugins:
                 try:
                     plugin._capture_auth_from_context(callback_context)  # noqa: SLF001
-                    plugin.fetch_policy(tool_context=callback_context)
                 except Exception:
                     logger.exception("플러그인 사전 준비 중 오류")
 

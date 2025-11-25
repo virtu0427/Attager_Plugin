@@ -121,46 +121,71 @@ def load_agent_cards(tool_context) -> List[str]:
 
 # --- 2. Remote Agent 호출 ---
 
+# agent_executor.py (또는 tools.py)
+
 async def call_remote_agent(tool_context, agent_name: str, task: str):
     """
-    A2A SDK 0.3.5 기준, 공식 튜토리얼 non-streaming 방식
+    A2A SDK 기반 리모트 에이전트 호출 (토큰 전파 기능 추가됨)
     """
     # 1. 에이전트 카드 조회
     cards: dict[str, AgentCard] = tool_context.state.get("cards", {})
-    card = cards.get(agent_name)
-    if not card:
-        return {"error": f"Agent {agent_name} not found"}
+    
+    # [Strict Mode 대응] 대소문자 유연성 확보 (선택사항)
+    # 만약 cards 키가 소문자인데 요청이 대문자로 오면 못 찾을 수 있음
+    target_card = cards.get(agent_name)
+    if not target_card:
+        # 혹시 모르니 소문자로도 한번 찾아봄
+        for k, v in cards.items():
+            if k.lower() == agent_name.lower():
+                target_card = v
+                break
+    
+    if not target_card:
+        return {"error": f"Agent '{agent_name}' not found in registry."}
 
-    # 2. 클라이언트 준비
+    # ------------------------------------------------------------------
+    # 2. [핵심 수정] 토큰 전파 (Token Propagation)
+    # ------------------------------------------------------------------
     auth_token = ""
     if hasattr(tool_context, "state"):
         auth_token = tool_context.state.get("auth_token", "") or ""
 
     default_headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else None
 
-    try:
-        async with httpx.AsyncClient(timeout=30.0, headers=default_headers) as httpx_client:
-            from a2a.client import A2AClient
-            client = A2AClient(httpx_client=httpx_client, agent_card=card)
+    # ==================================================================
+    # [검증] 여기서 로그가 안 찍히거나 None이면, 오케스트레이터도 토큰을 못 잡은 겁니다.
+    # ==================================================================
+    print(f"🔥🔥 [Orchestrator 발신 체크] Agent: {agent_name}, Token 존재여부: {bool(auth_token)}")
+    if auth_token:
+        print(f"🔥🔥 [Orchestrator 발신 체크] Token 값: {auth_token[:15]}...")
+    else:
+        print(f"🔥🔥 [Orchestrator 발신 체크] ⚠️ 경고: 토큰 없이 요청을 보냅니다!")
+    # ==================================================================
 
-            # 3. 요청 메시지 (messageId 필드명 주의)
+    try:
+        async with httpx.AsyncClient(timeout=60.0, headers=default_headers) as httpx_client:
+            from a2a.client import A2AClient
+            client = A2AClient(httpx_client=httpx_client, agent_card=target_card)
+
+            # 3. 요청 메시지 생성
             message = Message(
                 role=Role.user,
                 parts=[Part(root=TextPart(text=task))],
-                messageId=uuid.uuid4().hex,  # ✅ message_id → messageId
+                messageId=uuid.uuid4().hex,
             )
             send_params = MessageSendParams(message=message)
             request = SendMessageRequest(id=str(uuid.uuid4()), params=send_params)
 
             # 4. 서버 호출
+            print(f"[Tool:call_remote_agent] Sending request to {target_card.url}...")
             resp = await client.send_message(request)
 
-            # 5. 결과를 JSON으로 덤프
+            # 5. 결과 반환
             return resp.model_dump(mode="json", exclude_none=True)
+            
     except Exception as exc:
         logger.error("원격 에이전트 호출 실패 (%s): %s", agent_name, exc)
-        return {"error": f"failed to call agent {agent_name}: {exc}"}
-
+        return {"error": f"Failed to call agent {agent_name}: {exc}"}
 # --- 3. 응답 집계 ---
 
 def return_result(tool_context: ToolContext, result: str) -> str:
@@ -212,7 +237,7 @@ BOOTSTRAP_AUTH_TOKEN = (
 )
 
 # Orchestrator의 고유 agent_id
-AGENT_ID = "orchestrator"
+AGENT_ID = "Orchestrator"
 
 plugin = PolicyEnforcementPlugin(
     agent_id=AGENT_ID,

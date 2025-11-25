@@ -1,5 +1,6 @@
 import click
 import uvicorn
+from starlette.requests import Request # 타입 힌트용
 
 from a2a.types import (
     AgentCapabilities,
@@ -10,8 +11,10 @@ from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from agent import root_agent as delivery_agent, plugin
-from agent_executor import ADKAgentExecutor
 
+# [수정] agent_executor에서 정의한 변수를 import
+from agent_executor import ADKAgentExecutor, request_token_var
+from iam.policy_enforcement import GLOBAL_REQUEST_TOKEN
 
 def main(inhost, inport):
     # Agent card (metadata)
@@ -27,7 +30,7 @@ def main(inhost, inport):
             AgentSkill(
                 id="delivery_agent",
                 name="manage delivery operations",
-                description="Handle delivery data retrieval, status tracking, and delivery management",
+                description="Handle delivery data retrieval...",
                 tags=["delivery", "logistics", "tracking"],
                 examples=[
                     "Read delivery data for ORD1001",
@@ -42,17 +45,47 @@ def main(inhost, inport):
     request_handler = DefaultRequestHandler(
         agent_executor=ADKAgentExecutor(
             agent=delivery_agent,
-            plugins=[plugin]  # IAM 정책 플러그인 적용
+            plugins=[plugin]
         ),
         task_store=InMemoryTaskStore(),
     )
 
-    server = A2AStarletteApplication(
+    # 1. A2A 앱 생성
+    server_app = A2AStarletteApplication(
         agent_card=agent_card,
         http_handler=request_handler,
     )
 
-    uvicorn.run(server.build(), host=inhost, port=inport)
+    # 2. [수정] .build()를 먼저 호출하여 Starlette 앱 객체를 얻습니다.
+    app = server_app.build()
+
+    # 3. [수정] 미들웨어 추가: 헤더를 낚아채서 ContextVar에 저장
+    @app.middleware("http")
+    async def token_capture_middleware(request, call_next):
+        auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
+        
+        token_reset_token = None
+        if auth_header:
+            token_val = auth_header
+            if token_val.lower().startswith("bearer "):
+                token_val = token_val[7:].strip()
+            
+            # [여기!] 플러그인이 볼 수 있는 변수에 저장
+            token_reset_token = GLOBAL_REQUEST_TOKEN.set(token_val)
+            print(f"🔥🔥 [1. Middleware] 토큰을 GLOBAL_VAR에 저장함: {token_val[:10]}... 🔥🔥", flush=True)
+        else:
+            print(f"🔥🔥 [1. Middleware] 헤더 없음 🔥🔥", flush=True)
+
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            # (선택사항) 요청 처리가 끝나면 변수 초기화 (메모리 누수 방지)
+            if token_reset_token:
+                GLOBAL_REQUEST_TOKEN.reset(token_reset_token)
+
+    print(f"Delivery Agent Running on {inhost}:{inport}", flush=True)
+    uvicorn.run(app, host=inhost, port=inport)
 
 
 if __name__ == "__main__":

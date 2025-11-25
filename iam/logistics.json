@@ -1,0 +1,18 @@
+{
+	"template": "custom",
+	"author": "secutiry manager",
+	"tenant": "logistics",
+	"allowed_list": [
+		{
+			"agent_id": "Delivery Agent",
+			"allowed_tools": [
+				"get_delivery_data",
+				"get_completed_deliveries"
+			]
+		},
+        {
+            "agent_id": "Orchestrator", 
+            "allowed_tools": ["call_remote_agent", "load_agent_cards", "return_result"]
+        }
+	]
+}

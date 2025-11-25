@@ -3,21 +3,24 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 from typing import Any, Dict, Iterable, Optional, Sequence
+from contextvars import ContextVar
+GLOBAL_REQUEST_TOKEN: ContextVar[str | None] = ContextVar("global_request_token", default=None)
 
 import jwt
 import google.generativeai as genai
 import requests
 from google.adk.plugins.base_plugin import BasePlugin
 
-try:  # Optional imports for building ADK responses gracefully
+try:
     from google.genai.types import Content, Part
     from google.adk.models.llm_response import LlmResponse
-except ImportError:  # pragma: no cover - fallback for environments without these extras
-    Content = None  # type: ignore[assignment]
-    Part = None  # type: ignore[assignment]
-    LlmResponse = None  # type: ignore[assignment]
+except ImportError:
+    Content = None
+    Part = None
+    LlmResponse = None
 
 
 class PolicyEnforcementPlugin(BasePlugin):
@@ -41,7 +44,13 @@ class PolicyEnforcementPlugin(BasePlugin):
         self.log_server_url = log_server_url.rstrip("/")
         self.gemini_api_key = gemini_api_key
         self._models: Dict[str, Any] = {}
+        
+        # [Stateless] 전역 self.policy 대신 캐시만 유지
+        self._policy_cache: Dict[str, Dict[str, Any]] = {}
+        
+        # [필수] 레거시 호환성 및 에러 방지를 위한 빈 객체
         self.policy: Dict[str, Any] = {}
+
         self._jwt_secret = os.getenv("JWT_SECRET") or os.getenv("SECRET_KEY")
         self._jwt_public_key = os.getenv("JWT_PUBLIC_KEY")
         self._jwt_algorithm = os.getenv("JWT_ALGORITHM") or os.getenv("ALGORITHM") or "HS256"
@@ -56,10 +65,8 @@ class PolicyEnforcementPlugin(BasePlugin):
             genai.configure(api_key=gemini_api_key)
             self._models[self._DEFAULT_MODEL] = genai.GenerativeModel(self._DEFAULT_MODEL)
 
-        self.fetch_policy()
-
     # ------------------------------------------------------------------
-    # Policy retrieval helpers
+    # [안전장치] agent_executor가 호출하더라도 죽지 않게 빈 메서드 유지
     # ------------------------------------------------------------------
     def fetch_policy(
         self,
@@ -68,30 +75,129 @@ class PolicyEnforcementPlugin(BasePlugin):
         tool_args: Optional[Dict[str, Any]] = None,
         force: bool = False,
     ) -> None:
-        """Fetch the latest IAM policy for the configured agent."""
-        token_for_logging = self._extract_auth_token(tool_context, tool_args or {})
-        token_changed = token_for_logging != self._last_policy_fetch_token
-        should_refresh = force or token_changed or not self.policy
+        pass
 
-        try:
-            if should_refresh:
-                resp = requests.get(
-                    f"{self.policy_server_url}/api/iam/policy/{self.agent_id}",
-                    timeout=3,
-                )
-                resp.raise_for_status()
-                self.policy = resp.json()
-                if token_for_logging:
-                    self._last_policy_fetch_token = token_for_logging
+    # ------------------------------------------------------------------
+    # Policy retrieval helpers
+    # ------------------------------------------------------------------
+    def _get_policy_for_tenant(self, tenant_str: str) -> Dict[str, Any]:
+        """
+        [디버그 모드] 테넌트 정책 로드 및 파싱 상세 로그 출력
+        """
+        # 1. 캐시에 있으면 리턴
+        if tenant_str in self._policy_cache:
+            return self._policy_cache[tenant_str]
 
-            self._log_policy_fetch(token_for_logging or self._last_policy_fetch_token or "")
-        except Exception as exc:  # pragma: no cover - network failures during runtime
-            print(f"[PolicyPlugin] 정책 로드 실패: {exc}")
-            self.policy = {}
+        merged_policy = {
+            "template": "merged_policy",
+            "tenant": tenant_str,
+            "allowed_list": [] 
+        }
+        
+        valid_targets = set()
+        merged_agent_map = {}
+        policy_found = False
+
+        for tenant_read in tenant_str.split(","):
+            tenant_clean = tenant_read.strip() # 파일명은 OS 의존적이므로 그대로 둠
+            if not tenant_clean: continue
+            
+            # 파일 경로는 소문자로 가정 (만약 파일명이 대문자라면 여기도 수정 필요)
+            policy_path = os.path.join("iam", f"{tenant_clean.lower()}.json")
+            
+            if os.path.exists(policy_path):
+                try:
+                    with open(policy_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                        policy_found = True
+                        
+                        raw_list = data.get("allowed_list", [])
+                        print(f"[DEBUG] 파일 '{policy_path}' 로드. 항목 수: {len(raw_list)}")
+                        
+                        for rule in raw_list:
+                            raw_aid = rule.get("agent_id")
+                            
+                            if raw_aid:
+                                # [Strict Mode] .lower() 제거! 있는 그대로 저장
+                                clean_aid = str(raw_aid).strip()
+                                valid_targets.add(clean_aid)
+                                
+                                tools = rule.get("allowed_tools", [])
+                                if clean_aid in merged_agent_map:
+                                    existing_tools = set(merged_agent_map[clean_aid]["allowed_tools"])
+                                    existing_tools.update(tools)
+                                    merged_agent_map[clean_aid]["allowed_tools"] = list(existing_tools)
+                                else:
+                                    merged_agent_map[clean_aid] = {
+                                        "agent_id": clean_aid,
+                                        "allowed_tools": list(set(tools))
+                                    }
+                except Exception as e:
+                    print(f"[ERROR] 정책 파일 로드 실패 ({policy_path}): {e}")
+
+        if policy_found:
+            merged_policy["allowed_list"] = list(merged_agent_map.values())
+            merged_policy["_valid_targets"] = valid_targets 
+            
+            self._policy_cache[tenant_str] = merged_policy
+            
+            print(f"[DEBUG] 최종 승인된 에이전트 목록: {valid_targets}")
+            return merged_policy
+        
+        return {}
 
     # ------------------------------------------------------------------
     # ADK callbacks
     # ------------------------------------------------------------------
+    def _check_allowlist_rule(
+        self,
+        tool_name: str,
+        policy: Dict[str, Any],
+        tenant_id: str,
+        tool_args: Dict[str, Any]
+    ) -> Optional[str]:
+        
+        if not policy:
+            return f"No policy defined for tenant '{tenant_id}'."
+
+        allowed_list = policy.get("allowed_list", [])
+        
+        # 1. [자기 식별] Strict Match (대소문자 구분)
+        my_id_strict = self.agent_id.strip()
+
+        my_rule = next(
+            (
+                item for item in allowed_list 
+                if str(item.get("agent_id", "")).strip() == my_id_strict
+            ), 
+            None
+        )
+
+        if not my_rule:
+            return f"Access Denied: Agent '{self.agent_id}' is not defined in the policy."
+
+        # 2. [도구 권한 확인]
+        my_allowed_tools = my_rule.get("allowed_tools", [])
+        
+        if tool_name not in my_allowed_tools:
+            return f"Tool '{tool_name}' is NOT allowed for agent '{self.agent_id}'."
+
+        # 3. [오케스트레이터 전용] call_remote_agent 타겟 검증
+        if tool_name == "call_remote_agent":
+            target_agent = tool_args.get("agent_name")
+            if not target_agent:
+                return "Missing 'agent_name' argument."
+            
+            # [수정됨] .lower() 제거! 입력된 타겟 이름 그대로 비교 (Strict Mode)
+            target_strict = str(target_agent).strip()
+            
+            valid_targets = policy.get("_valid_targets", set())
+            
+            if target_strict not in valid_targets:
+                return f"Access Denied: Target '{target_agent}' is not a valid agent in this tenant."
+
+        return None
+    
     async def before_model_callback(
         self,
         *,
@@ -99,44 +205,15 @@ class PolicyEnforcementPlugin(BasePlugin):
         llm_request: Any,
         **kwargs: Any,
     ) -> Optional[Any]:
-        """Validate user prompts before the LLM is invoked."""
-        self._capture_auth_from_context(callback_context)
-        self.fetch_policy(tool_context=callback_context)
-        if not self._policy_enabled():
-            return None
-
-        prompt_rules = self._get_prompt_rules()
-        if not prompt_rules:
-            return None
-
-        user_prompt = self._extract_user_message(llm_request)
-        if not user_prompt:
-            return None
-
-        rule = prompt_rules[0]
-        system_prompt = rule.get("system_prompt", "")
-        model_name = rule.get("model")
-
-        verdict = await self._inspect_with_llm(system_prompt, user_prompt, model_name)
-        print(f"[PolicyPlugin][{self.agent_id}] 프롬프트 판정: {verdict}")
-
-        if verdict != "SAFE":
-            self._send_log(
-                {
-                    "agent_id": self.agent_id,
-                    "policy_type": "prompt_validation",
-                    "prompt": user_prompt,
-                    "verdict": "VIOLATION",
-                    "reason": "사용자 프롬프트가 IAM 정책을 위반했습니다.",
-                }
-            )
-            violation_message = (
-                f"[{self.agent_id}] 죄송합니다. 귀하의 요청이 시스템 정책에 위반되어 처리할 수 없습니다.\n\n"
-                "위반 사유: 시스템 프롬프트에서 정의한 보안 및 사용 정책을 준수하지 않는 요청입니다.\n"
-                "정책에 부합하는 요청을 다시 시도해주시기 바랍니다."
-            )
-            return self._create_llm_response(violation_message)
-
+        
+        incoming_token = self._extract_auth_token(callback_context, {})
+        
+        if incoming_token:
+            if hasattr(callback_context, "state") and isinstance(callback_context.state, dict):
+                callback_context.state["auth_token"] = incoming_token
+            elif hasattr(callback_context, "session") and hasattr(callback_context.session, "state"):
+                 callback_context.session.state["auth_token"] = incoming_token
+        
         return None
 
     async def before_tool_callback(
@@ -148,46 +225,52 @@ class PolicyEnforcementPlugin(BasePlugin):
         callback_context: Any = None,
         **kwargs: Any,
     ) -> Optional[Dict[str, Any]]:
-        """Validate tool invocations against IAM tool rules."""
-        self._capture_auth_from_context(callback_context or tool_context)
-        callback = callback_context or tool_context
-        self.fetch_policy(tool_context=callback, tool_args=tool_args)
+        
+        ctx = callback_context or tool_context
+        
+        claims = self._get_auth_claims(ctx, tool_args)
+        current_tenant = self._extract_tenant_from_claims(claims)
 
-        token_for_tools = self._extract_auth_token(callback, tool_args)
-        if token_for_tools and hasattr(tool_context, "state"):
-            with contextlib.suppress(Exception):
-                tool_context.state.setdefault("auth_token", token_for_tools)
+        if not current_tenant or current_tenant.startswith("<"):
+            return {"error": "Access Denied: No valid tenant found."}
 
-        if not self._policy_enabled():
-            return None
-
-        tool_rules = self._get_tool_rules()
-        if not tool_rules:
-            return None
+        request_policy = self._get_policy_for_tenant(current_tenant)
+        
+        if not request_policy:
+            return {"error": f"Access Denied: No policy found for tenant '{current_tenant}'."}
 
         tool_name = getattr(tool, "name", str(tool))
-        print(f"[PolicyPlugin][{self.agent_id}] 툴 검증: {tool_name} {tool_args}")
+        
+        violation = self._check_allowlist_rule(
+            tool_name, 
+            request_policy, 
+            current_tenant, 
+            tool_args
+        )
 
-        rule = tool_rules.get(tool_name)
-        if not rule:
-            return None
-
-        violation = self._check_tool_rule(tool_name, tool_args, rule, tool_context)
         if violation:
-            self._send_log(
-                {
-                    "agent_id": self.agent_id,
-                    "policy_type": "tool_validation",
-                    "tool_name": tool_name,
-                    "tool_args": tool_args,
-                    "verdict": "BLOCKED",
-                    "reason": violation,
-                }
-            )
-            print(f"[PolicyPlugin][{self.agent_id}] 툴 차단: {violation}")
-            return {"error": f"Tool call blocked: {violation}"}
+            self._send_log({
+                "agent_id": self.agent_id,
+                "type": "tool_blocked",
+                "tool": tool_name,
+                "reason": violation,
+                "tenant": current_tenant
+            })
+            print(f"[PolicyPlugin] ⛔ 차단됨({current_tenant}): {violation}")
+            return {"error": f"Policy Violation: {violation}"}
 
+        print(f"[PolicyPlugin] ✅ 승인됨({current_tenant}): {tool_name}")
         return None
+
+    # ... (나머지 helper 함수들은 그대로 두세요) ...
+    # _policy_enabled, _get_prompt_rules, _get_tool_rules
+    # _extract_user_message, _inspect_with_llm, _resolve_model
+    # _check_tool_rule, _create_llm_response, _send_log
+    # _ingest_initial_auth, _log_policy_fetch, _capture_auth_from_context
+    # _extract_auth_token, _extract_token_from_container, _get_auth_claims
+    # _decode_jwt, _log_token_inspection, _log_policy_binding
+    # _normalize_required_roles, _extract_roles_from_claims
+    # _extract_tenant_from_claims, _roles_satisfied, _sanitize_bearer
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -388,9 +471,10 @@ class PolicyEnforcementPlugin(BasePlugin):
 
         claims = self._decode_jwt(token)
         roles = self._extract_roles_from_claims(claims)
+        tenant = self._extract_tenant_from_claims(claims)
         subject = claims.get("sub") or claims.get("email") or claims.get("user") or "<unknown>"
         token_preview = token if len(token) <= 18 else f"{token[:10]}...{token[-6:]}"
-        print(f"{base_message} (subject={subject}, roles={roles or []}, token={token_preview})")
+        print(f"{base_message} (subject={subject}, roles={roles or []}, tenant={tenant}, token={token_preview})")
 
     def _capture_auth_from_context(self, callback_context: Any) -> None:
         token = self._extract_token_from_container(callback_context)
@@ -398,6 +482,69 @@ class PolicyEnforcementPlugin(BasePlugin):
             self._captured_token_hint = token
 
     def _extract_auth_token(self, tool_context: Any, tool_args: Dict[str, Any]) -> str:
+        # [지뢰 3] 플러그인 동작 확인용 로그 (객체 내부 구조 공개)
+        direct_token = GLOBAL_REQUEST_TOKEN.get()
+        
+        if direct_token:
+            print(f"🔥🔥 [3. Plugin] ContextVar 직통 터널에서 토큰 발견! ({direct_token[:10]}...) 🔥🔥", flush=True)
+            return self._sanitize_bearer(direct_token)
+        # [디버깅] 도대체 tool_context 안에 뭐가 들었는지 속성을 다 찍어봅니다.
+        try:
+            attributes = dir(tool_context)
+            # 너무 많으니 _로 시작하는 거 빼고 출력
+            public_attrs = [a for a in attributes if not a.startswith('_')]
+            print(f"🔥🔥 [3. Plugin] Context 속성 목록: {public_attrs} 🔥🔥", flush=True)
+        except:
+            pass
+
+        # ---------------------------------------------------------
+        # [탐색 1] Executor가 넣어둔 세션 State 찾기 (강력한 탐색)
+        # ---------------------------------------------------------
+        possible_states = []
+
+        # 1. tool_context.state
+        if hasattr(tool_context, "state"):
+            possible_states.append(tool_context.state)
+        
+        # 2. tool_context.session.state
+        if hasattr(tool_context, "session"):
+            session = getattr(tool_context, "session", None)
+            if session and hasattr(session, "state"):
+                possible_states.append(session.state)
+
+        # 3. tool_context.context.state (중첩된 경우)
+        if hasattr(tool_context, "context"):
+            inner_ctx = getattr(tool_context, "context", None)
+            if inner_ctx:
+                if hasattr(inner_ctx, "state"):
+                    possible_states.append(inner_ctx.state)
+                if hasattr(inner_ctx, "session") and hasattr(inner_ctx.session, "state"):
+                    possible_states.append(inner_ctx.session.state)
+
+        # 4. (추가) attributes 딕셔너리 확인
+        if hasattr(tool_context, "attributes") and isinstance(tool_context.attributes, dict):
+             possible_states.append(tool_context.attributes)
+
+        # 수집된 모든 state 후보군을 뒤져서 토큰 찾기
+        for state in possible_states:
+            if not state: continue
+            
+            # dict인 경우
+            if isinstance(state, dict):
+                token = state.get("auth_token")
+                if token:
+                    print(f"🔥🔥 [3. Plugin] ⭕ 찾았다! (Dict State) 토큰: {token[:10]}... 🔥🔥", flush=True)
+                    return self._sanitize_bearer(token)
+            # object인 경우
+            elif hasattr(state, "auth_token"):
+                token = getattr(state, "auth_token")
+                if token:
+                    print(f"🔥🔥 [3. Plugin] ⭕ 찾았다! (Obj State) 토큰: {token[:10]}... 🔥🔥", flush=True)
+                    return self._sanitize_bearer(token)
+
+        # ---------------------------------------------------------
+        # [탐색 2] 도구 인자(Arguments)에서 찾기
+        # ---------------------------------------------------------
         tool_args = tool_args or {}
         candidates = [
             tool_args.get("auth_token"),
@@ -406,6 +553,9 @@ class PolicyEnforcementPlugin(BasePlugin):
             tool_args.get("authorization"),
         ]
 
+        # ---------------------------------------------------------
+        # [탐색 3] 기타 컨테이너 재귀 탐색 (헤더 등)
+        # ---------------------------------------------------------
         candidates.append(self._extract_token_from_container(tool_context))
         candidates.append(self._extract_token_from_container(getattr(tool_context, "metadata", None)))
 
@@ -418,10 +568,16 @@ class PolicyEnforcementPlugin(BasePlugin):
         for candidate in candidates:
             cleaned = self._sanitize_bearer(candidate)
             if cleaned:
+                print(f"🔥🔥 [3. Plugin] ⭕ 찾았다! (Container/Args) 토큰: {cleaned[:10]}... 🔥🔥", flush=True)
                 return cleaned
+        
+        print(f"🔥🔥 [3. Plugin] ❌ 실패: 모든 곳을 뒤졌으나 토큰이 없습니다. 🔥🔥", flush=True)
         return ""
 
     def _extract_token_from_container(self, container: Any, _visited: Optional[set[int]] = None) -> str:
+        # [디버깅] 들어오는 요청의 헤더를 훔쳐보자
+        if isinstance(container, dict) and "auth_token" in container:
+             print(f"🔥🔥 [3. Plugin] 발견! 컨테이너 안에 auth_token 있음: {str(container.get('auth_token'))[:10]}... 🔥🔥", flush=True)
         if not container:
             return ""
 
@@ -542,6 +698,36 @@ class PolicyEnforcementPlugin(BasePlugin):
             elif isinstance(value, Iterable):
                 roles.extend(str(item).strip().lower() for item in value if str(item).strip())
         return roles
+
+    def _extract_tenant_from_claims(self, claims: Dict[str, Any]) -> str:
+        """
+        Pydantic 스키마(TenantValue)에 맞춰 테넌트 정보를 추출합니다.
+        Target Key: "tenant"
+        Type: str | List[str]
+        """
+        if not isinstance(claims, dict):
+            return "<unknown_tenant>"
+
+        # 1. 스키마에 정의된 정확한 키 'tenant'를 우선 확인
+        # 서버 스키마: class TokenData(BaseModel): tenant: TenantValue | None
+        val = claims.get("tenant")
+
+        # 2. 값이 없는 경우, 관례적인 다른 키들도 확인 (혹시 모르니)
+        if val is None:
+            for fallback_key in ["tid", "tenant_id", "org_id"]:
+                val = claims.get(fallback_key)
+                if val: break
+        
+        if val is None:
+            return "<no_tenant>"
+
+        # 3. TenantValue = Union[str, List[str]] 처리
+        if isinstance(val, list):
+            # 리스트인 경우: 로그 가독성을 위해 콤마로 연결하거나 첫 번째 값 사용
+            # 예: ['a', 'b'] -> "a,b"
+            return ",".join(str(v) for v in val)
+        
+        return str(val).strip()
 
     def _roles_satisfied(self, user_roles: list[str], required_roles: list[str]) -> bool:
         user_role_set = {role.lower() for role in user_roles}
