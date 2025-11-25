@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
-from typing import Any, Dict, Iterable, Optional, Sequence
-from contextvars import ContextVar
-GLOBAL_REQUEST_TOKEN: ContextVar[str | None] = ContextVar("global_request_token", default=None)
+import re
+import threading
+import time
+from collections import OrderedDict
+from typing import Any, Dict, Iterable, Optional, Sequence, Tuple
 
 import jwt
 import google.generativeai as genai
@@ -27,6 +30,16 @@ class PolicyEnforcementPlugin(BasePlugin):
     """IAM 기반 정책 집행 플러그인."""
 
     _DEFAULT_MODEL = "gemini-2.0-flash"
+    _DEFAULT_REPLAY_TTL_SECONDS = 5.0
+    _DEFAULT_USER_ERROR_MESSAGE = "요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+    _SECRET_PATTERNS = [
+        (re.compile(r"(Authorization\s*:\s*Bearer\s+)[A-Za-z0-9\-\._~+/=]+", re.IGNORECASE), r"\1***"),
+        (re.compile(r"(Bearer\s+)[A-Za-z0-9\-\._~+/=]+", re.IGNORECASE), r"\1***"),
+        (re.compile(r"(api[_-]?key\s*[=:]\s*)([^\s]+)", re.IGNORECASE), r"\1***"),
+        (re.compile(r"(token\s*[=:]\s*)([^\s]+)", re.IGNORECASE), r"\1***"),
+        (re.compile(r"(secret\s*[=:]\s*)([^\s]+)", re.IGNORECASE), r"\1***"),
+    ]
+    _PATH_PATTERN = re.compile(r"((?:[A-Za-z]:)?[\\/][^\s]+)")
 
     def __init__(
         self,
@@ -58,6 +71,13 @@ class PolicyEnforcementPlugin(BasePlugin):
         self._last_auth_token: str | None = None
         self._captured_token_hint: str | None = None
         self._last_policy_fetch_token: str | None = None
+        self._replay_cache: "OrderedDict[str, float]" = OrderedDict()
+        self._replay_lock = threading.Lock()
+        ttl_env = os.getenv("POLICY_PLUGIN_REPLAY_TTL")
+        try:
+            self._replay_ttl = float(ttl_env) if ttl_env else self._DEFAULT_REPLAY_TTL_SECONDS
+        except ValueError:
+            self._replay_ttl = self._DEFAULT_REPLAY_TTL_SECONDS
 
         self._ingest_initial_auth(initial_auth_token, initial_context)
 
@@ -205,6 +225,47 @@ class PolicyEnforcementPlugin(BasePlugin):
         llm_request: Any,
         **kwargs: Any,
     ) -> Optional[Any]:
+        """Validate user prompts before the LLM is invoked."""
+        self._capture_auth_from_context(callback_context)
+        replay_block = self._guard_soft_replay(callback_context or {}, llm_request)
+        if replay_block is not None:
+            return replay_block
+        self.fetch_policy(tool_context=callback_context)
+        if not self._policy_enabled():
+            return None
+
+        prompt_rules = self._get_prompt_rules()
+        if not prompt_rules:
+            return None
+
+        user_prompt = self._extract_user_message(llm_request)
+        if not user_prompt:
+            return None
+
+        rule = prompt_rules[0]
+        system_prompt = rule.get("system_prompt", "")
+        model_name = rule.get("model")
+
+        verdict = await self._inspect_with_llm(system_prompt, user_prompt, model_name)
+        print(f"[PolicyPlugin][{self.agent_id}] 프롬프트 판정: {verdict}")
+
+        if verdict != "SAFE":
+            self._send_log(
+                {
+                    "agent_id": self.agent_id,
+                    "policy_type": "prompt_validation",
+                    "prompt": user_prompt,
+                    "verdict": "VIOLATION",
+                    "reason": "사용자 프롬프트가 IAM 정책을 위반했습니다.",
+                }
+            )
+            violation_message = (
+                f"[{self.agent_id}] 죄송합니다. 귀하의 요청이 시스템 정책에 위반되어 처리할 수 없습니다.\n\n"
+                "위반 사유: 시스템 프롬프트에서 정의한 보안 및 사용 정책을 준수하지 않는 요청입니다.\n"
+                "정책에 부합하는 요청을 다시 시도해주시기 바랍니다."
+            )
+            return self._create_llm_response(violation_message)
+
         
         incoming_token = self._extract_auth_token(callback_context, {})
         
@@ -249,6 +310,20 @@ class PolicyEnforcementPlugin(BasePlugin):
         )
 
         if violation:
+            user_safe_message = self.sanitize_error_message(violation)
+            log_safe_violation = self.sanitize_error_message(violation, audience="log")
+            self._send_log(
+                {
+                    "agent_id": self.agent_id,
+                    "policy_type": "tool_validation",
+                    "tool_name": tool_name,
+                    "tool_args": tool_args,
+                    "verdict": "BLOCKED",
+                    "reason": log_safe_violation,
+                }
+            )
+            print(f"[PolicyPlugin][{self.agent_id}] 툴 차단: {log_safe_violation}")
+            return {"error": user_safe_message}
             self._send_log({
                 "agent_id": self.agent_id,
                 "type": "tool_blocked",
@@ -261,6 +336,50 @@ class PolicyEnforcementPlugin(BasePlugin):
 
         print(f"[PolicyPlugin] ✅ 승인됨({current_tenant}): {tool_name}")
         return None
+
+    def _guard_soft_replay(self, callback_context: Any, llm_request: Any) -> Optional[Any]:
+        payload_hash = self._hash_llm_request(llm_request)
+        if not payload_hash:
+            return None
+
+        email = self._extract_replay_subject(callback_context)
+        if not email:
+            return None
+
+        key = self._build_replay_key(email, payload_hash)
+        now = time.monotonic()
+        replay_detected = False
+
+        with self._replay_lock:
+            self._cleanup_replay_cache(now)
+            last_seen = self._replay_cache.get(key)
+            if last_seen is None:
+                self._replay_cache[key] = now
+            else:
+                if now - last_seen <= self._replay_ttl:
+                    replay_detected = True
+                else:
+                    self._replay_cache[key] = now
+            self._replay_cache.move_to_end(key)
+
+        if not replay_detected:
+            return None
+
+        reason = "Repeated message payload detected within replay TTL"
+        self._send_log(
+            {
+                "agent_id": self.agent_id,
+                "policy_type": "replay_protection",
+                "verdict": "BLOCKED",
+                "reason": reason,
+                "tool_name": None,
+            }
+        )
+        violation_message = (
+            "요청이 너무 짧은 시간 안에 반복되어 soft replay 정책에 의해 차단되었습니다.\n"
+            "잠시 후 다시 시도해주세요."
+        )
+        return self._create_llm_response(violation_message)
 
     # ... (나머지 helper 함수들은 그대로 두세요) ...
     # _policy_enabled, _get_prompt_rules, _get_tool_rules
@@ -434,6 +553,7 @@ class PolicyEnforcementPlugin(BasePlugin):
         raise RuntimeError(message)
 
     def _send_log(self, payload: Dict[str, Any]) -> None:
+        payload = self._sanitize_payload(dict(payload))
         try:
             requests.post(
                 f"{self.log_server_url}/api/logs",
@@ -741,3 +861,117 @@ class PolicyEnforcementPlugin(BasePlugin):
         if token_str.lower().startswith("bearer "):
             return token_str[7:].strip()
         return token_str
+
+    # ------------------------------------------------------------------
+    # Soft replay helpers
+    # ------------------------------------------------------------------
+    def _hash_llm_request(self, llm_request: Any) -> str:
+        contents = getattr(llm_request, "contents", None)
+        if not contents:
+            return ""
+
+        target_contents: list[Any] = []
+        for content in reversed(contents):
+            if getattr(content, "role", None) == "user":
+                target_contents = [content]
+                break
+        if not target_contents:
+            target_contents = list(contents)
+
+        segments: list[str] = []
+        for content in target_contents:
+            role = getattr(content, "role", None) or "unknown"
+            parts = getattr(content, "parts", None) or []
+            for part in parts:
+                entry = [role]
+                text = getattr(part, "text", None)
+                if text:
+                    entry.append(text)
+
+                func = getattr(part, "function_call", None)
+                if func:
+                    name = getattr(func, "name", "")
+                    args = getattr(func, "args", {}) or {}
+                    serialized_args = self._safe_json_dump(args)
+                    entry.append(f"FUNC:{name}:{serialized_args}")
+
+                file_data = getattr(part, "file_data", None)
+                if file_data:
+                    uri = getattr(file_data, "file_uri", "")
+                    mime = getattr(file_data, "mime_type", "")
+                    entry.append(f"FILE:{uri}:{mime}")
+
+                if len(entry) > 1:
+                    segments.append("|".join(entry))
+
+        if not segments:
+            return ""
+
+        serialized = "\n".join(segments)
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _safe_json_dump(data: Any) -> str:
+        try:
+            return json.dumps(data, sort_keys=True, ensure_ascii=False)
+        except TypeError:
+            return json.dumps(str(data))
+
+    def _extract_replay_subject(self, callback_context: Any) -> Tuple[str, str]:
+        claims = self._get_auth_claims(callback_context, {}) if callback_context else {}
+        email = str(
+            claims.get("email")
+            or claims.get("sub")
+            or claims.get("user")
+            or claims.get("principal")
+            or ""
+        ).strip()
+
+        return email
+
+    def _build_replay_key(self, email: str, payload_hash: str) -> str:
+        return f"{email}|{payload_hash}"
+
+    def _cleanup_replay_cache(self, now: float) -> None:
+        expire_before = now - self._replay_ttl
+        keys_to_delete = []
+        for key, timestamp in self._replay_cache.items():
+            if timestamp < expire_before:
+                keys_to_delete.append(key)
+            else:
+                break
+        for key in keys_to_delete:
+            self._replay_cache.pop(key, None)
+
+    # ------------------------------------------------------------------
+    # Error sanitization helpers
+    # ------------------------------------------------------------------
+    def sanitize_error_message(self, message: str, *, audience: str = "user") -> str:
+        sanitized = self._apply_secret_filters(message or "")
+        if audience == "log":
+            return sanitized
+
+        condensed = sanitized.strip()
+        if not condensed:
+            return self._DEFAULT_USER_ERROR_MESSAGE
+
+        if len(condensed) > 200:
+            condensed = condensed[:200] + "..."
+
+        return f"{self._DEFAULT_USER_ERROR_MESSAGE}\n세부 정보: {condensed}"
+
+    def _apply_secret_filters(self, text: str) -> str:
+        sanitized = text or ""
+        for pattern, replacement in self._SECRET_PATTERNS:
+            sanitized = pattern.sub(replacement, sanitized)
+        sanitized = self._PATH_PATTERN.sub("<path>", sanitized)
+        return sanitized
+
+    def _sanitize_payload(self, payload: Any):
+        if isinstance(payload, dict):
+            return {key: self._sanitize_payload(value) for key, value in payload.items()}
+        if isinstance(payload, list):
+            return [self._sanitize_payload(item) for item in payload]
+        if isinstance(payload, str):
+            return self._apply_secret_filters(payload)
+        return payload

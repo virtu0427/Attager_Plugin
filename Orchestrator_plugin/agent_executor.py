@@ -9,6 +9,7 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
 logger = logging.getLogger(__name__)
+_DEFAULT_USER_ERROR = "요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
 
 
 class ADKAgentExecutor(AgentExecutor):
@@ -97,9 +98,10 @@ class ADKAgentExecutor(AgentExecutor):
 
         except Exception as e:
             logger.exception("ADKAgentExecutor.execute 오류")
+            safe_error = self._format_user_error(str(e))
             error_msg = Message(
                 role=Role.agent,
-                parts=[Part(root=TextPart(text=f"[Error] {str(e)}"))],
+                parts=[Part(root=TextPart(text=safe_error))],
                 messageId=uuid4().hex,
             )
             await event_queue.enqueue_event(error_msg)
@@ -113,9 +115,38 @@ class ADKAgentExecutor(AgentExecutor):
         if getattr(context, "call_context", None):
             state = getattr(context.call_context, "state", {}) or {}
             headers = state.get("headers") or {}
+        message = getattr(context, "message", None)
+        message_metadata = {}
+        task_id = None
+        message_id = None
+        if message is not None:
+            message_metadata = getattr(message, "metadata", {}) or {}
+            task_id = getattr(message, "taskId", None) or message_metadata.get("taskId")
+            message_id = getattr(message, "messageId", None)
 
         return {
             "headers": headers,
             "metadata": getattr(context, "metadata", {}) or {},
             "state": state,
+            "message": {
+                "metadata": message_metadata,
+                "taskId": task_id,
+                "messageId": message_id,
+            },
         }
+
+    def _format_user_error(self, raw_message: str) -> str:
+        message = raw_message or ""
+        for plugin in self.plugins:
+            sanitizer = getattr(plugin, "sanitize_error_message", None)
+            if callable(sanitizer):
+                try:
+                    return sanitizer(message)
+                except Exception:  # pragma: no cover - defensive
+                    logger.exception("에러 메시지 정제 실패")
+        condensed = message.strip()
+        if condensed:
+            if len(condensed) > 200:
+                condensed = condensed[:200] + "..."
+            return f"{_DEFAULT_USER_ERROR}\n세부 정보: {condensed}"
+        return _DEFAULT_USER_ERROR
