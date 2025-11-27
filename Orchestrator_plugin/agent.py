@@ -155,11 +155,11 @@ async def call_remote_agent(tool_context, agent_name: str, task: str):
     # ==================================================================
     # [검증] 여기서 로그가 안 찍히거나 None이면, 오케스트레이터도 토큰을 못 잡은 겁니다.
     # ==================================================================
-    print(f"🔥🔥 [Orchestrator 발신 체크] Agent: {agent_name}, Token 존재여부: {bool(auth_token)}")
+    print(f"[Orchestrator 발신 체크] Agent: {agent_name}, Token 존재여부: {bool(auth_token)}")
     if auth_token:
-        print(f"🔥🔥 [Orchestrator 발신 체크] Token 값: {auth_token[:15]}...")
+        print(f"[Orchestrator 발신 체크] Token 값: {auth_token[:15]}...")
     else:
-        print(f"🔥🔥 [Orchestrator 발신 체크] ⚠️ 경고: 토큰 없이 요청을 보냅니다!")
+        print(f"[Orchestrator 발신 체크] ⚠️ 경고: 토큰 없이 요청을 보냅니다")
     # ==================================================================
 
     try:

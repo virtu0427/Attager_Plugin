@@ -72,9 +72,9 @@ def main(inhost, inport):
             
             # [여기!] 플러그인이 볼 수 있는 변수에 저장
             token_reset_token = GLOBAL_REQUEST_TOKEN.set(token_val)
-            print(f"🔥🔥 [1. Middleware] 토큰을 GLOBAL_VAR에 저장함: {token_val[:10]}... 🔥🔥", flush=True)
+            print(f"[1. Middleware] 토큰을 GLOBAL_VAR에 저장함: {token_val[:10]}...", flush=True)
         else:
-            print(f"🔥🔥 [1. Middleware] 헤더 없음 🔥🔥", flush=True)
+            print(f"[1. Middleware] 헤더 없음", flush=True)
 
         try:
             response = await call_next(request)

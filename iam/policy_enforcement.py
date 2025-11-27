@@ -606,14 +606,14 @@ class PolicyEnforcementPlugin(BasePlugin):
         direct_token = GLOBAL_REQUEST_TOKEN.get()
         
         if direct_token:
-            print(f"🔥🔥 [3. Plugin] ContextVar 직통 터널에서 토큰 발견! ({direct_token[:10]}...) 🔥🔥", flush=True)
+            print(f"[3. Plugin] ContextVar 직통 터널에서 토큰 발견 ({direct_token[:10]}...)", flush=True)
             return self._sanitize_bearer(direct_token)
         # [디버깅] 도대체 tool_context 안에 뭐가 들었는지 속성을 다 찍어봅니다.
         try:
             attributes = dir(tool_context)
             # 너무 많으니 _로 시작하는 거 빼고 출력
             public_attrs = [a for a in attributes if not a.startswith('_')]
-            print(f"🔥🔥 [3. Plugin] Context 속성 목록: {public_attrs} 🔥🔥", flush=True)
+            print(f"[3. Plugin] Context 속성 목록: {public_attrs}", flush=True)
         except:
             pass
 
@@ -653,13 +653,13 @@ class PolicyEnforcementPlugin(BasePlugin):
             if isinstance(state, dict):
                 token = state.get("auth_token")
                 if token:
-                    print(f"🔥🔥 [3. Plugin] ⭕ 찾았다! (Dict State) 토큰: {token[:10]}... 🔥🔥", flush=True)
+                    print(f"[3. Plugin] ⭕ (Dict State) 토큰: {token[:10]}...", flush=True)
                     return self._sanitize_bearer(token)
             # object인 경우
             elif hasattr(state, "auth_token"):
                 token = getattr(state, "auth_token")
                 if token:
-                    print(f"🔥🔥 [3. Plugin] ⭕ 찾았다! (Obj State) 토큰: {token[:10]}... 🔥🔥", flush=True)
+                    print(f"[3. Plugin] ⭕ 찾았다! (Obj State) 토큰: {token[:10]}...", flush=True)
                     return self._sanitize_bearer(token)
 
         # ---------------------------------------------------------
@@ -688,16 +688,16 @@ class PolicyEnforcementPlugin(BasePlugin):
         for candidate in candidates:
             cleaned = self._sanitize_bearer(candidate)
             if cleaned:
-                print(f"🔥🔥 [3. Plugin] ⭕ 찾았다! (Container/Args) 토큰: {cleaned[:10]}... 🔥🔥", flush=True)
+                print(f"[3. Plugin] ⭕ (Container/Args) 토큰: {cleaned[:10]}...", flush=True)
                 return cleaned
         
-        print(f"🔥🔥 [3. Plugin] ❌ 실패: 모든 곳을 뒤졌으나 토큰이 없습니다. 🔥🔥", flush=True)
+        print(f"[3. Plugin] ❌ 실패: 토큰이 없습니다.", flush=True)
         return ""
 
     def _extract_token_from_container(self, container: Any, _visited: Optional[set[int]] = None) -> str:
         # [디버깅] 들어오는 요청의 헤더를 훔쳐보자
         if isinstance(container, dict) and "auth_token" in container:
-             print(f"🔥🔥 [3. Plugin] 발견! 컨테이너 안에 auth_token 있음: {str(container.get('auth_token'))[:10]}... 🔥🔥", flush=True)
+             print(f"[3. Plugin] 컨테이너 안에 auth_token 있음: {str(container.get('auth_token'))[:10]}...", flush=True)
         if not container:
             return ""
 

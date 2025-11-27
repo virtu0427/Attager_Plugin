@@ -14,7 +14,7 @@ from Orchestrator_plugin.agent import (
     root_agent as orchestrator_agent,
 )
 from Orchestrator_plugin.agent_executor import ADKAgentExecutor
-
+from iam.policy_enforcement import GLOBAL_REQUEST_TOKEN
 
 def main(inhost: str, inport: int):
     """Launch the orchestrator agent server."""

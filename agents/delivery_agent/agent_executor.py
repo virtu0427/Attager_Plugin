@@ -54,7 +54,7 @@ class ADKAgentExecutor(AgentExecutor):
             if not auth_token:
                 auth_token = request_token_var.get()
                 # [지뢰 3] ContextVar 확인
-                print(f"🔥🔥 [2. Executor] ContextVar 조회 결과: {bool(auth_token)} 🔥🔥", flush=True)
+                print(f"[2. Executor] ContextVar 조회 결과: {bool(auth_token)}", flush=True)
 
             if auth_token:
                 session = await self.session_service.get_session(
@@ -68,9 +68,9 @@ class ADKAgentExecutor(AgentExecutor):
                         session.state = {}
                     session.state["auth_token"] = auth_token
                     # [지뢰 4] 세션 주입 성공
-                    print(f"🔥🔥 [2. Executor] 세션(ID:{current_session_id})에 토큰 주입 완료! 🔥🔥", flush=True)
+                    print(f"[2. Executor] 세션(ID:{current_session_id})에 토큰 주입 완료", flush=True)
             else:
-                print("🔥🔥 [2. Executor] ⚠️ 실패: 주입할 토큰이 없습니다. 🔥🔥", flush=True)
+                print("[2. Executor] ⚠️ 실패: 주입할 토큰이 없습니다.", flush=True)
             # =================================================================
 
             # 사용자 입력 추출
