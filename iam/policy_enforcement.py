@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+from contextvars import ContextVar
 import hashlib
 import json
 import os
@@ -24,6 +25,11 @@ except ImportError:
     Content = None
     Part = None
     LlmResponse = None
+
+
+GLOBAL_REQUEST_TOKEN: ContextVar[str | None] = ContextVar(
+    "global_request_token", default=None
+)
 
 
 class PolicyEnforcementPlugin(BasePlugin):
