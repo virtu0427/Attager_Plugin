@@ -13,7 +13,7 @@ from a2a.server.tasks import InMemoryTaskStore
 from agent import root_agent as delivery_agent, plugin
 
 # [수정] agent_executor에서 정의한 변수를 import
-from agent_executor import ADKAgentExecutor, request_token_var
+from agent_executor import ADKAgentExecutor
 from iam.policy_enforcement import GLOBAL_REQUEST_TOKEN
 
 def main(inhost, inport):

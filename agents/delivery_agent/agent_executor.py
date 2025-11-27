@@ -1,8 +1,5 @@
 import logging
 from uuid import uuid4
-from contextvars import ContextVar
-
-request_token_var: ContextVar[str | None] = ContextVar("request_token", default=None)
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
@@ -10,6 +7,7 @@ from a2a.types import Message, TextPart, Part, Role
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
+from iam.policy_enforcement import GLOBAL_REQUEST_TOKEN
 
 logger = logging.getLogger(__name__)
 _DEFAULT_USER_ERROR = "요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
@@ -52,7 +50,7 @@ class ADKAgentExecutor(AgentExecutor):
                 auth_token = context.metadata.get("Authorization") or context.metadata.get("authorization")
             
             if not auth_token:
-                auth_token = request_token_var.get()
+                auth_token = GLOBAL_REQUEST_TOKEN.get()
                 # [지뢰 3] ContextVar 확인
                 print(f"🔥🔥 [2. Executor] ContextVar 조회 결과: {bool(auth_token)} 🔥🔥", flush=True)
 
