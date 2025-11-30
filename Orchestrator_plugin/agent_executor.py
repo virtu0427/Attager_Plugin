@@ -1,5 +1,6 @@
 import logging
 from uuid import uuid4
+
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.types import Message, TextPart, Part, Role
@@ -7,6 +8,7 @@ from google.adk.errors.already_exists_error import AlreadyExistsError
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
+from iam.policy_enforcement import GLOBAL_REQUEST_TOKEN
 
 logger = logging.getLogger(__name__)
 _DEFAULT_USER_ERROR = "요청을 처리하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
@@ -124,10 +126,22 @@ class ADKAgentExecutor(AgentExecutor):
             task_id = getattr(message, "taskId", None) or message_metadata.get("taskId")
             message_id = getattr(message, "messageId", None)
 
+        # Ensure downstream plugins and tools can access the caller token even
+        # if the request handler didn't attach headers/state. We rely on the
+        # GLOBAL_REQUEST_TOKEN set by the middleware in __main__.py.
+        token = GLOBAL_REQUEST_TOKEN.get(None)
+
+        safe_headers = dict(headers) if isinstance(headers, dict) else {}
+        safe_state = dict(state) if isinstance(state, dict) else {}
+
+        if token:
+            safe_headers.setdefault("Authorization", f"Bearer {token}")
+            safe_state.setdefault("auth_token", token)
+
         return {
-            "headers": headers,
+            "headers": safe_headers,
             "metadata": getattr(context, "metadata", {}) or {},
-            "state": state,
+            "state": safe_state,
             "message": {
                 "metadata": message_metadata,
                 "taskId": task_id,
