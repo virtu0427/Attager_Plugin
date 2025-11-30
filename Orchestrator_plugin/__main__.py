@@ -1,5 +1,6 @@
 import click
 import uvicorn
+from starlette.requests import Request  # type: ignore[unused-import]
 
 from a2a.types import (
     AgentCapabilities,
@@ -51,7 +52,35 @@ def main(inhost: str, inport: int):
         http_handler=request_handler,
     )
 
-    uvicorn.run(server.build(), host=inhost, port=inport)
+    # Build the Starlette app first so we can attach middleware that captures
+    # the incoming Authorization header. The PolicyEnforcementPlugin and
+    # remote tool callers both rely on GLOBAL_REQUEST_TOKEN to propagate the
+    # caller's JWT to downstream agents.
+    app = server.build()
+
+    @app.middleware("http")
+    async def token_capture_middleware(request, call_next):
+        auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
+
+        token_reset_token = None
+        if auth_header:
+            token_val = auth_header
+            if token_val.lower().startswith("bearer "):
+                token_val = token_val[7:].strip()
+
+            token_reset_token = GLOBAL_REQUEST_TOKEN.set(token_val)
+            print(f"[1. Middleware] 토큰을 GLOBAL_VAR에 저장함: {token_val[:10]}...", flush=True)
+        else:
+            print("[1. Middleware] 헤더 없음", flush=True)
+
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            if token_reset_token:
+                GLOBAL_REQUEST_TOKEN.reset(token_reset_token)
+
+    uvicorn.run(app, host=inhost, port=inport)
 
 
 @click.command()

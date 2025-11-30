@@ -30,7 +30,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
 from utils.model_config import get_model_with_fallback
-from iam.policy_enforcement import PolicyEnforcementPlugin
+from iam.policy_enforcement import GLOBAL_REQUEST_TOKEN, PolicyEnforcementPlugin
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -149,6 +149,9 @@ async def call_remote_agent(tool_context, agent_name: str, task: str):
     auth_token = ""
     if hasattr(tool_context, "state"):
         auth_token = tool_context.state.get("auth_token", "") or ""
+
+    if not auth_token:
+        auth_token = GLOBAL_REQUEST_TOKEN.get("")
 
     default_headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else None
 
