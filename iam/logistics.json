@@ -13,6 +13,13 @@
         {
             "agent_id": "Orchestrator", 
             "allowed_tools": ["call_remote_agent", "load_agent_cards", "return_result"]
-        }
+        },
+		{
+			"agent_id": "Quality Agent",
+			"allowed_tools": [
+				"get_quality_data",
+				"get_completed_quality"
+			]
+		}
 	]
 }

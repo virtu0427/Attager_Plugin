@@ -32,4 +32,4 @@ COPY agents/vehicle_agent/.env* ./
 EXPOSE 10004
 
 # Run the agent
-CMD ["python", "__main__.py"]
+CMD ["python", "__main__.py", "--host", "0.0.0.0", "--port", "10004"]
